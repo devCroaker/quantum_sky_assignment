@@ -209,10 +209,30 @@ class ScenarioReport(Wire):
 
 
 class CriticalityReason(StrEnum):
-    """The three independent reasons R7 gives for calling an element critical."""
+    """Why an element is critical. R7 gives three reasons; we report four.
+
+    R7b says an element is critical if losing it leaves any demand
+    undeliverable, and the panel confirmed the literal reading: a demand
+    lost because its own endpoint went away counts. That is why
+    ``ENDPOINT_DEMANDS_LOST`` exists as a reason of its own rather than being
+    folded into ``DEMANDS_UNDELIVERABLE``.
+
+    Splitting it matters because of what the literal reading costs. Every
+    node that originates traffic becomes critical the moment it fails, which
+    is 36 of the 37 nodes in the real network, since file A is a full mesh of
+    all 28 cities and R4 gives every site a demand. Only the aggregation hub
+    escapes, because it forwards traffic but originates none. The ``critical``
+    flag therefore stops discriminating, exactly as R7b specifies.
+
+    Keeping the reason separate is what preserves the signal underneath. A
+    reader who wants the genuine single points of failure filters for
+    ``PARTITIONS_NETWORK`` or ``DEMANDS_UNDELIVERABLE``; a reader who wants
+    R7b as written reads the flag. Neither has to recompute anything.
+    """
 
     PARTITIONS_NETWORK = "partitions-network"
     DEMANDS_UNDELIVERABLE = "demands-undeliverable"
+    ENDPOINT_DEMANDS_LOST = "endpoint-demands-lost"
     LINKS_OVERLOADED = "links-overloaded"
 
 

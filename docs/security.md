@@ -17,12 +17,28 @@ branches work without colliding in one file.
 
 ## Triggers
 
-Pull requests, pushes to `main`, and a weekly cron at 04:17 UTC on Mondays.
+Pull requests, pushes to `main`, and manual dispatch. The scheduled trigger is **written and
+commented out**.
 
-The schedule is the part that earns its keep. A pull-request trigger tells you about the code
-you just wrote. It never tells you that a dependency you merged six weeks ago had an advisory
-published yesterday, because nothing in the repository changed. On a project where the code
-sits still between milestones, the scheduled run is the only trigger that catches that case.
+Every check, Snyk included, runs on every pull request. That is the trigger that matters
+day to day, because it blocks a dependency change at the point of review.
+
+The schedule is the one trigger that catches something the others cannot. A pull-request run
+tells you about the code you just wrote. It never tells you that a dependency merged six weeks
+ago had an advisory published yesterday, because nothing in the repository changed. On a
+long-lived service that case is the main reason to have these checks at all, and the schedule
+should be on.
+
+It is off here on purpose. This repository is short-lived, and a weekly cron on a quiet
+repository produces runs nobody reads, which is precisely how a failing security job comes to
+be ignored. The cron line is left in place, commented, with the reasoning next to it, so
+enabling it is uncommenting two lines rather than rediscovering the decision.
+
+Until then the same sweep is available on demand, from the Actions tab or with:
+
+```bash
+gh workflow run Security
+```
 
 `permissions: contents: read` and a `concurrency` group match `ci.yml`. The workflow needs no
 write token: nothing it does writes to the repository.
@@ -51,9 +67,11 @@ install would actually get.
   that a human has to triage.
 - The specific environment a human has locally, unless they run `make install` first. The
   gate is CI's resolution, not theirs.
-- Because the project has no lockfile, the audited versions are whatever the resolver picked
-  on the day the job ran. Two runs a week apart can audit different versions. See the gaps
-  section.
+- Nothing about a version that is not in `backend/uv.lock`. Since the install uses
+  `uv sync --locked`, the audited versions are exactly the pinned ones, and a lockfile that
+  disagrees with `pyproject.toml` fails the job before the audit runs. Two runs a week apart
+  audit the same versions, so a change in result means a newly published advisory rather than
+  a different resolution.
 
 `--skip-editable` drops `netscope` itself, which is installed from the working tree and has no
 PyPI release to look up. `--strict` is deliberately not used, because it would turn that one
@@ -101,39 +119,62 @@ threshold for the production dependency tree should drop to `moderate`, with the
 threshold kept only for `devDependencies` (`npm audit --omit=dev --audit-level=moderate` as a
 second gate).
 
-### 3. `snyk`, optional and credential-free by default
+### 3. `snyk`, enabled, and still safe without a token
 
-Snyk needs an account token and this repository has none. The job therefore probes
-`${{ secrets.SNYK_TOKEN }}` in its first step, writes an output, and gates every later step on
-it. With no token the job prints an explanation and succeeds. It never fails, and it never
-blocks the workflow.
+`SNYK_TOKEN` is configured as a repository secret, so this job **runs for real on every pull
+request and push to `main`**, scanning both halves and failing on high severity and above.
 
-That is not politeness. Secrets are not available to workflows triggered from a fork, and a
-clone of this repository by a reviewer has no secrets at all, so a Snyk job that failed
-without a token would be red on every fork and on every fresh clone. A permanently red job is
-worse than no job.
+The job still probes for the token in its first step and gates every later step on the result,
+because a secret is not always present even when it is configured. GitHub does not pass
+secrets to workflows triggered from a fork, and a reviewer's fresh clone has none at all. A
+Snyk job that failed in those cases would be red on every fork and every clone, and a
+permanently red job is worse than no job. With no token it prints an explanation naming the
+secret to add, succeeds, and does not block the workflow.
 
-**To enable it:**
+The probe reads the secret into an environment variable rather than testing the expression in
+an `if:`, because a secret is not available to a job-level condition.
 
-1. Create a free Snyk account and copy the API token from <https://app.snyk.io/account>.
-2. In this repository, go to **Settings > Secrets and variables > Actions > New repository
-   secret**.
-3. Name it exactly `SNYK_TOKEN`. It must be a repository secret, not an environment secret
-   and not a variable, because the workflow reads `secrets.SNYK_TOKEN` with no `environment:`
-   set.
-
-Nothing else changes. The next run picks it up. `pip-audit` and `npm audit` keep working
-either way, so Snyk is additive and the workflow is never dependent on it.
+`pip-audit` and `npm audit` need no credential and run regardless, so Snyk is additive and the
+workflow never depends on it.
 
 **What it adds over the free checks.** A second advisory database with its own curation and
 its own timing, which sometimes carries a finding days before the public feeds, plus severity
 scoring and fix advice. **What it does not add:** it is still dependency scanning. It does not
 look at our code, and on the free tier the test count is limited.
 
-The back end scan freezes the resolved environment to a throwaway requirements file under
-`$RUNNER_TEMP` and scans that, because Snyk reads a requirements file for Python and this
-project declares ranges in `pyproject.toml` with no lockfile. Nothing is committed. The front
-end is scanned too, behind the same file probe.
+The back end scan exports `backend/uv.lock` to a throwaway requirements file under
+`$RUNNER_TEMP` and scans that, because Snyk reads a requirements file for Python.
+`--no-emit-project` drops `netscope` itself, which has no PyPI release. Nothing is committed,
+and the exported versions are the pinned ones rather than a fresh resolution. The front end
+is scanned too, behind the same file probe.
+
+Snyk's pip scanner needed three accommodations, each of which cost a failed run to find.
+Hashes are suppressed, because `uv export` writes them and Snyk's parser does not want them.
+The environment is installed and `--command` points at its interpreter, because Snyk resolves
+the dependency tree through a real interpreter rather than from the file alone, and without
+one it fails with `SNYK-OS-PYTHON-0013`, "Missing required packages", even when every version
+is pinned. And `--skip-unresolved` is set, which is Snyk's own documented remedy for that
+error, so a package it cannot resolve is skipped rather than failing the run.
+
+That last flag is a caveat worth stating plainly: a silently skipped package is not scanned by
+Snyk. It is not a hole, because `pip-audit` covers the same tree with no such limitation and
+fails on any finding. Snyk's value here is a second curated advisory database on top, not the
+only line of defence.
+
+**Read the dependency counts in the log before trusting a green Snyk tick.** A real run
+reports:
+
+```
+Scan the back end    Tested 61 dependencies for known issues, found 0 issues
+Scan the front end   Tested  3 dependencies for known issues, found 0 issues
+```
+
+Sixty-one is the whole locked back end tree. **Three is not the front end tree.** Snyk's npm
+scan covers production dependencies only, which here is `react`, `react-dom` and one
+transitive package. The hundreds of build and test packages are not in that number. They are
+covered by `npm audit`, which reads the full tree including `devDependencies`, and that is why
+both checks exist rather than one. A green Snyk result on the front end says nothing about the
+toolchain.
 
 The Snyk CLI is installed with `npm install --global snyk@1` rather than through
 `snyk/actions/*`, because those actions are published only from a branch and offer no version
@@ -191,14 +232,13 @@ Stated plainly, because a green workflow is easy to over-read. All of the follow
   question can only be answered by re-resolving, which may give a different answer.
 - **No license compliance check.** Nothing checks the license of any dependency. A copyleft
   license arriving through a transitive dependency would go unnoticed.
-- **No runtime dependency pinning beyond the lockfile, on either half.** The front end will
-  have `package-lock.json` once P15 lands, which pins the tree for `npm ci` but is not
-  integrity-verified against a registry mirror. The back end has **no lockfile at all**: it
-  declares ranges (`fastapi>=0.115`, and so on) in `backend/pyproject.toml`, so two installs
-  on different days can produce different versions. The audit result is therefore a statement
-  about the day it ran, not about a reproducible artefact. The P20 plan entry asked for
-  lockfiles on both halves; they are not part of this change, which is the largest known gap
-  in this document.
+- **No verification that a lockfile matches an upstream registry.** Both halves are now
+  locked: `backend/uv.lock` is committed and installed with `uv sync --locked`, and the front
+  end has `package-lock.json` for `npm ci` once P15 lands. Both carry hashes, so a package
+  whose contents changed under a fixed version is detected. Neither is checked against a
+  registry mirror or a signing authority, so a compromised package published under a new
+  version and then legitimately locked by Dependabot would pass. That is what dependency
+  review on pull requests, item 4 below, partly addresses.
 - **No CI hardening.** Actions are tag-pinned (see above), `GITHUB_TOKEN` permissions are
   read-only at the workflow level, and there is no `pull_request_target` anywhere, but there
   is no OIDC, no egress restriction on runners, and no artefact signing or provenance
@@ -215,11 +255,11 @@ Stated plainly, because a green workflow is easy to over-read. All of the follow
 The smallest set of additions that would make this adequate for an internal deployment, in
 priority order. Each line is a day of work or less.
 
-1. **Lock both halves.** Commit a `uv.lock` (or a `requirements.txt` compiled with
-   `uv pip compile`) for the back end, and `package-lock.json` for the front end, and make the
-   audit jobs read the lockfiles. Without this, every other item on this list reports on an
-   environment that is not reproducible. This is the one item that changes what the existing
-   checks mean.
+1. ~~**Lock both halves.**~~ **Done**, and it was the item that changed what the other
+   checks mean. `backend/uv.lock` is committed, `make install` and both workflows use
+   `uv sync --locked`, `make check` runs `uv lock --check` so a dependency change cannot land
+   without its lockfile, and the Snyk scan exports the lock rather than re-resolving. The
+   front end half arrives as `package-lock.json` with P15.
 2. **Real secret scanning in CI.** Add gitleaks as a job and turn on GitHub push protection.
    `detect-private-key` covers one key format for people who installed the hook. A leaked
    token is the most likely real incident for a repository like this.
