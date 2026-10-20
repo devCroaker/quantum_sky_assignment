@@ -292,3 +292,58 @@ class TestScenarioEndpointDuplicateAndCombinedFailures:
             ).json()
         )
         assert node_and_link.model_copy(update={"failed": node_only.failed}) == node_only
+
+
+def test_an_unrelated_value_error_is_not_dressed_up_as_a_bad_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A bug in our code must surface as a 500, not as a tidy 422.
+
+    The scenario route used to validate ids by catching the ValueError that
+    routing raises for an unknown id, and telling it apart from any other
+    ValueError by matching the wording of its message. That conflated two
+    different things: an unknown id in a request is a client mistake, while a
+    ValueError out of the routing code is a fault in ours. Catching the second
+    to serve the first would hide real faults behind a plausible error body,
+    and no test would fail, because a 422 naming a field is exactly what a
+    reader expects to see.
+
+    Ids are now checked against the network before analysis runs, so this
+    deliberately broken analysis must escape rather than be reported as bad
+    input.
+    """
+
+    def exploding_analyse(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("something is wrong inside the analysis, not with the request")
+
+    monkeypatch.setattr("netscope.api.routes.analyse", exploding_analyse)
+
+    app = create_app(REAL_SETTINGS)
+    with TestClient(app) as client, pytest.raises(ValueError, match="inside the analysis"):
+        client.post("/api/v1/scenario", json={"failed_nodes": ["Dublin"]})
+
+
+def test_an_unknown_id_is_rejected_before_any_analysis_runs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The 422 must not depend on the analysis being reached at all.
+
+    This is the other half of the test above: with analysis replaced by
+    something that would fail loudly, a request naming an unknown node still
+    returns a clean 422, which proves the check happens first rather than as a
+    rescue after the fact.
+    """
+
+    def exploding_analyse(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("analysis should never be reached for an unknown id")
+
+    monkeypatch.setattr("netscope.api.routes.analyse", exploding_analyse)
+
+    app = create_app(REAL_SETTINGS)
+    with TestClient(app) as client:
+        response = client.post("/api/v1/scenario", json={"failed_nodes": ["Atlantis"]})
+
+    assert response.status_code == 422
+    parsed = ErrorResponse.model_validate(response.json())
+    assert parsed.error.field == "failed_nodes"
+    assert "Atlantis" in parsed.error.message

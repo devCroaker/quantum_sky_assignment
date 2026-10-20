@@ -29,7 +29,7 @@ from netscope.api.schemas import (
     ScenarioReport,
     ScenarioRequest,
 )
-from netscope.api.state import get_state
+from netscope.api.state import AppState, get_state
 
 __all__ = ["router"]
 
@@ -85,27 +85,59 @@ async def post_scenario(
     state = get_state(request)
     failed_nodes = frozenset(payload.failed_nodes)
     failed_links = frozenset(payload.failed_links)
-    try:
-        analysis = analyse(state.network, failed_nodes=failed_nodes, failed_links=failed_links)
-    except ValueError as exc:
-        return _unknown_id_response(str(exc))
+
+    rejection = _reject_unknown_ids(state, failed_nodes, failed_links)
+    if rejection is not None:
+        return rejection
+
+    # Any ValueError from here is a bug in our own code, not a bad request, so
+    # it is deliberately not caught: it must surface as a 500 rather than be
+    # dressed up as a client error.
+    analysis = analyse(state.network, failed_nodes=failed_nodes, failed_links=failed_links)
     return mappers.scenario_report(analysis)
 
 
-def _unknown_id_response(message: str) -> JSONResponse:
-    """Turn ``routing.route``'s own validation message into a 422 body.
+def _reject_unknown_ids(
+    state: AppState,
+    failed_nodes: frozenset[str],
+    failed_links: frozenset[str],
+) -> JSONResponse | None:
+    """Check the requested ids against the network, or return ``None``.
 
-    ``netscope.routing._reject_unknown`` raises exactly two message shapes,
-    "unknown node ids in the failed set: ..." or "unknown link ids in the
-    failed set: ...", each already naming the offending id(s) (R2). The
-    prefix tells us which request field was at fault; nothing here
-    re-derives that from the network, so the response cannot disagree with
-    the exception it is reporting.
+    Validation happens here rather than by catching the ``ValueError`` that
+    ``routing.route`` raises for the same thing, for two reasons.
+
+    A caught exception has to be told apart from every other ``ValueError``,
+    and the only handle on it is the wording of its message. Matching on that
+    makes a response depend on a private helper's prose: reword the message
+    and this quietly labels a bad node id as a link problem, with no test
+    failing, because the fallback branch is still a plausible answer.
+
+    It also conflates two different things. An unknown id in a request is a
+    client mistake and a 422. A ``ValueError`` from the routing code is a bug
+    in ours and should be a 500. Catching the second to serve the first hides
+    real faults behind a tidy error body.
+
+    Nodes are checked before links, matching the fail-fast convention in D14:
+    one precise message beats a list whose later entries may be noise.
     """
-    field = "failed_nodes" if "node ids" in message else "failed_links"
-    return JSONResponse(
-        status_code=422,
-        content=ErrorResponse(error=ErrorDetail(message=message, field=field)).model_dump(
-            mode="json"
-        ),
-    )
+    for field, requested, known in (
+        ("failed_nodes", failed_nodes, state.network.nodes.keys()),
+        ("failed_links", failed_links, state.network.links.keys()),
+    ):
+        unknown = sorted(requested - set(known))
+        if unknown:
+            noun = "node" if field == "failed_nodes" else "link"
+            plural = "s" if len(unknown) > 1 else ""
+            return JSONResponse(
+                status_code=422,
+                content=ErrorResponse(
+                    error=ErrorDetail(
+                        message=(
+                            f"unknown {noun} id{plural} in the failed set: {', '.join(unknown)}"
+                        ),
+                        field=field,
+                    )
+                ).model_dump(mode="json"),
+            )
+    return None
