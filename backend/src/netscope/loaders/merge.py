@@ -86,6 +86,7 @@ def build_network(
     sites: tuple[ParsedSite, ...],
     *,
     sites_file: str,
+    backbone_capacity: float = BACKBONE_CAPACITY,
 ) -> Network:
     """Build the one merged ``Network`` the rest of the application reads.
 
@@ -96,6 +97,11 @@ def build_network(
             row is responsible for. It is passed in rather than inferred for
             the reason ``sites_csv.resolve`` gives: an error about a test
             fixture must not claim to be about the real input.
+        backbone_capacity: units on every backbone link. Defaults to the 550
+            that R3 fixes, and exists as a parameter so that the documented
+            NETSCOPE_BACKBONE_CAPACITY setting actually reaches the merge.
+            A configuration value that silently does nothing is worse than no
+            setting at all, because a reader believes it works.
 
     Raises:
         InputError: if the two files cannot be combined, naming
@@ -116,7 +122,7 @@ def build_network(
     # Links before placement: both can fail, and a duplicated access link is
     # a fact about the rows themselves, so reporting it is more use than
     # reporting whatever the geometry pass happens to trip over first.
-    links = _build_links(backbone, sites, sites_file)
+    links = _build_links(backbone, sites, sites_file, backbone_capacity)
     positions = geometry.place_sites(
         sites,
         {node.id: node.coordinates for node in backbone.nodes},
@@ -197,7 +203,10 @@ def _sites_of_kind(sites: Sequence[ParsedSite], kind: NodeKind) -> tuple[ParsedS
 
 
 def _build_links(
-    backbone: ParsedBackbone, sites: Sequence[ParsedSite], sites_file: str
+    backbone: ParsedBackbone,
+    sites: Sequence[ParsedSite],
+    sites_file: str,
+    backbone_capacity: float,
 ) -> Mapping[str, Link]:
     links: dict[str, Link] = {}
     # Endpoints sorts its own pair, so a reversed duplicate lands on the same
@@ -208,7 +217,7 @@ def _build_links(
         links[parsed.id] = Link(
             id=parsed.id,
             endpoints=parsed.endpoints,
-            capacity=BACKBONE_CAPACITY,
+            capacity=backbone_capacity,
             kind=LinkKind.BACKBONE,
         )
         owner_of_pair[parsed.endpoints] = parsed.id
