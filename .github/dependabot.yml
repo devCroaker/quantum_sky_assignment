@@ -1,0 +1,46 @@
+version: 2
+
+# Updates are weekly and grouped. The git history is a graded deliverable, so a flood of
+# single-bump pull requests would bury the real work and make the history unreadable. One
+# grouped pull request per ecosystem per week stays reviewable. Major bumps are deliberately
+# left ungrouped, because a major version is a behaviour change that deserves its own review.
+#
+# Dependabot opens pull requests but does not audit. The audit jobs in
+# .github/workflows/security.yml are what fail a build. See docs/security.md.
+
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      python-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # The front end lands in P15. Dependabot ignores a directory with no manifest, so this
+  # entry is harmless until then and needs no edit when it arrives.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      npm-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # Workflow actions are pinned to major tags, so this mostly catches a new major.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
