@@ -275,6 +275,61 @@ centroid keeps both tasks meaningful and keeps geometry out of the front end, pe
 **Consequence.** A circular attachment is detectable and is rejected in P7 with an
 `InputError` naming the file and a row, which is a case the brief does not mention.
 
+## D23. How a site is displaced from its attachments
+**Context.** P7 placed each site at the plain centroid of its attachments, which left
+`Warsaw`, `HUB-EAST` and `OPS-EAST-1` on one identical coordinate, and `OPS-WEST` and
+`OPS-SOUTHEAST` exactly on top of Dublin and Athens. Three markers at one pixel are
+unclickable, which breaks R11. The panel chose offset plus a proximity popover in the view,
+so the back end half is a displacement that makes every coordinate distinct.
+**Decided by.** Tool, within the panel's choice of approach.
+
+**Magnitude: 0.35 degrees, measured against the map rather than guessed.** The two closest
+backbone cities, Strasbourg and Zurich, are 1.4261 degrees apart, a figure taken from the file
+and asserted in a test. One offset is 0.245 of that smallest gap, so even a chained site two
+offsets out stays at half the gap and cannot reach a neighbouring city. It is also about 1.2
+percent of the network's 29.57 degree longitude span, which is visible at whole-network zoom.
+Rejected scaling by the cosine of latitude to equalise kilometres: the front end does the
+projecting, and a latitude-dependent magnitude would be a constant nobody could explain on a
+slide.
+
+**Direction is derived, not fixed.** For a site with two or more distinct attachments, the
+offset is perpendicular to the line through them, choosing whichever perpendicular points
+away from the nearest unrelated node. Perpendicular keeps the site equidistant from both ends,
+so it still reads as sitting between them. Rejected "outward from the centroid", which this
+plan originally suggested: for two attachments the outward direction is degenerate, since the
+unit vectors cancel, and for any symmetric set it gives no answer at all.
+
+For a site with one attachment there is no "away" from a single point, so the bearing comes
+from the surroundings: directly away from the nearest already-placed node that is not one of
+its attachments. `HUB-EAST` moves away from Budapest, `OPS-WEST` from Glasgow,
+`OPS-SOUTHEAST` from Belgrade. `OPS-EAST-1`'s nearest non-attachment is `Warsaw`, so the chain
+extends outward in a straight line rather than doubling back. Rejected deriving the bearing
+from a site's index among its siblings, which the plan suggested: that is arbitrary with
+respect to the map, and would have put `HUB-EAST` and `OPS-EAST-1` on the same bearing by
+coincidence rather than for a reason.
+
+**Distinctness is a property of the algorithm, not a hope.** A candidate position that
+coincides with one already taken is rotated by the golden angle until free. Rejected nudging
+by an epsilon, and rejected trusting the direction rules to be distinct enough, because
+neither makes the guarantee hold for two sites that attach to an identical set of nodes.
+Verified on the real data: zero coincident pairs out of 666, and the closest pair in the whole
+network is now `Athens` to `OPS-SOUTHEAST` at exactly one offset.
+
+**Consequence for P7's tests.** Four of them asserted a site sits *at* its centroid, which
+the offset makes false. They were amended rather than deleted or loosened to a tolerance that
+would hide the displacement. Each now keeps the centroid arithmetic in its docstring and
+asserts the placed point is exactly one offset from that centroid, plus, for `DC-NORTH`, that
+it is equidistant from Hamburg and Copenhagen. That pair of constraints still pins the
+centroid: a centroid computed from the wrong points lands at a different distance, and only a
+point displaced from the true midpoint can be equidistant from both cities. Confirmed by
+mutation: changing the centroid to take the first point's longitude instead of the mean fails
+eight tests, including both amended ones.
+
+**Known gap.** `contracts/fixtures/network.json` carries hand-invented site positions that
+predate this rule and are not produced by `build_network`. Nothing is broken, because the
+fixture is a cut-down network and not a snapshot of the real one, but P13 should not expect
+the two to agree when it wires the real loaders to the API.
+
 ---
 
 ## Open questions
