@@ -1,0 +1,686 @@
+{
+  "$defs": {
+    "Assessment": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "description": "True when at least one R7 reason applies",
+          "title": "Critical",
+          "type": "boolean"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "impact": {
+          "$ref": "#/$defs/FailureImpact"
+        },
+        "kind": {
+          "$ref": "#/$defs/ElementKind"
+        },
+        "reasons": {
+          "default": [],
+          "description": "Empty when the element is not critical",
+          "items": {
+            "$ref": "#/$defs/CriticalityReason"
+          },
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "critical",
+        "impact"
+      ],
+      "title": "Assessment",
+      "type": "object"
+    },
+    "CriticalityReason": {
+      "description": "The three independent reasons R7 gives for calling an element critical.",
+      "enum": [
+        "partitions-network",
+        "demands-undeliverable",
+        "links-overloaded"
+      ],
+      "title": "CriticalityReason",
+      "type": "string"
+    },
+    "CriticalityResponse": {
+      "additionalProperties": false,
+      "description": "GET /api/v1/criticality\n\nEvery node and every link, each with its reasons and its impact. The\ncritical ones are those with a non-empty reason list.",
+      "properties": {
+        "assessments": {
+          "items": {
+            "$ref": "#/$defs/Assessment"
+          },
+          "title": "Assessments",
+          "type": "array"
+        },
+        "summary": {
+          "$ref": "#/$defs/CriticalitySummary"
+        }
+      },
+      "required": [
+        "assessments",
+        "summary"
+      ],
+      "title": "CriticalityResponse",
+      "type": "object"
+    },
+    "CriticalitySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_links": {
+          "title": "Critical Links",
+          "type": "integer"
+        },
+        "critical_nodes": {
+          "title": "Critical Nodes",
+          "type": "integer"
+        },
+        "links_evaluated": {
+          "title": "Links Evaluated",
+          "type": "integer"
+        },
+        "nodes_evaluated": {
+          "title": "Nodes Evaluated",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "nodes_evaluated",
+        "links_evaluated",
+        "critical_nodes",
+        "critical_links"
+      ],
+      "title": "CriticalitySummary",
+      "type": "object"
+    },
+    "ElementKind": {
+      "enum": [
+        "node",
+        "link"
+      ],
+      "title": "ElementKind",
+      "type": "string"
+    },
+    "ErrorDetail": {
+      "additionalProperties": false,
+      "description": "A rejected input or request, located the way R2 requires.\n\nThe parts stay separate rather than being pre-formatted into a sentence,\nso the view can show the file and row as its own field and link to them.",
+      "properties": {
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "row": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "title": "ErrorDetail",
+      "type": "object"
+    },
+    "ErrorResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorDetail"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "title": "ErrorResponse",
+      "type": "object"
+    },
+    "FailedSet": {
+      "additionalProperties": false,
+      "description": "Which elements are down. An empty set is the baseline.",
+      "properties": {
+        "links": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Links",
+          "type": "array"
+        },
+        "nodes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Nodes",
+          "type": "array"
+        }
+      },
+      "title": "FailedSet",
+      "type": "object"
+    },
+    "FailureImpact": {
+      "additionalProperties": false,
+      "description": "What measurably happens when one element is lost.\n\nReported for every element, critical or not, so that the view can rank\nlinks by how much traffic depends on them.",
+      "properties": {
+        "components": {
+          "title": "Components",
+          "type": "integer"
+        },
+        "endpoint_affected_demands": {
+          "title": "Endpoint Affected Demands",
+          "type": "integer"
+        },
+        "endpoint_affected_units": {
+          "title": "Endpoint Affected Units",
+          "type": "number"
+        },
+        "max_utilization": {
+          "description": "Highest utilization on any surviving link after this failure",
+          "title": "Max Utilization",
+          "type": "number"
+        },
+        "overloaded_links": {
+          "title": "Overloaded Links",
+          "type": "integer"
+        },
+        "undeliverable_demands": {
+          "title": "Undeliverable Demands",
+          "type": "integer"
+        },
+        "undeliverable_units": {
+          "title": "Undeliverable Units",
+          "type": "number"
+        }
+      },
+      "required": [
+        "components",
+        "undeliverable_demands",
+        "undeliverable_units",
+        "endpoint_affected_demands",
+        "endpoint_affected_units",
+        "overloaded_links",
+        "max_utilization"
+      ],
+      "title": "FailureImpact",
+      "type": "object"
+    },
+    "LinkKind": {
+      "description": "Where a link came from, which decides how its capacity was set.",
+      "enum": [
+        "backbone",
+        "access"
+      ],
+      "title": "LinkKind",
+      "type": "string"
+    },
+    "LinkLoad": {
+      "additionalProperties": false,
+      "properties": {
+        "capacity": {
+          "title": "Capacity",
+          "type": "number"
+        },
+        "link_id": {
+          "title": "Link Id",
+          "type": "string"
+        },
+        "load": {
+          "description": "Demand units carried, summed over all demands",
+          "title": "Load",
+          "type": "number"
+        },
+        "utilization": {
+          "description": "load divided by capacity. 1.0 is exactly full",
+          "title": "Utilization",
+          "type": "number"
+        }
+      },
+      "required": [
+        "link_id",
+        "load",
+        "capacity",
+        "utilization"
+      ],
+      "title": "LinkLoad",
+      "type": "object"
+    },
+    "LinkWire": {
+      "additionalProperties": false,
+      "properties": {
+        "capacity": {
+          "title": "Capacity",
+          "type": "number"
+        },
+        "endpoints": {
+          "description": "The two node ids, sorted. Links have no direction, per R3.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Endpoints",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/LinkKind"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "endpoints",
+        "capacity"
+      ],
+      "title": "LinkWire",
+      "type": "object"
+    },
+    "NetworkResponse": {
+      "additionalProperties": false,
+      "description": "GET /api/v1/network\n\nThe topology and nothing derived from it. The 391 individual demands are\ndeliberately not included: the view never lists them all, and the ones it\ndoes show arrive with full detail in a scenario report.",
+      "properties": {
+        "links": {
+          "items": {
+            "$ref": "#/$defs/LinkWire"
+          },
+          "title": "Links",
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/NodeWire"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "totals": {
+          "$ref": "#/$defs/NetworkTotals"
+        }
+      },
+      "required": [
+        "nodes",
+        "links",
+        "totals"
+      ],
+      "title": "NetworkResponse",
+      "type": "object"
+    },
+    "NetworkTotals": {
+      "additionalProperties": false,
+      "description": "The R1 acceptance figures, served so the view can display them.",
+      "properties": {
+        "demand_units": {
+          "title": "Demand Units",
+          "type": "number"
+        },
+        "demands": {
+          "title": "Demands",
+          "type": "integer"
+        },
+        "links": {
+          "title": "Links",
+          "type": "integer"
+        },
+        "nodes": {
+          "title": "Nodes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "nodes",
+        "links",
+        "demands",
+        "demand_units"
+      ],
+      "title": "NetworkTotals",
+      "type": "object"
+    },
+    "NodeKind": {
+      "description": "What a node is, which decides whether it may forward traffic.",
+      "enum": [
+        "backbone-city",
+        "data-center",
+        "operations-site",
+        "aggregation-hub"
+      ],
+      "title": "NodeKind",
+      "type": "string"
+    },
+    "NodeWire": {
+      "additionalProperties": false,
+      "properties": {
+        "attaches_to": {
+          "default": [],
+          "description": "For a site from sites.csv, the node ids it attaches to. Empty for a backbone city. Present so the view can show R9's 'near what it attaches to' relationship.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Attaches To",
+          "type": "array"
+        },
+        "can_transit": {
+          "description": "R6: whether this node may forward traffic for other nodes",
+          "title": "Can Transit",
+          "type": "boolean"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/NodeKind"
+        },
+        "position": {
+          "$ref": "#/$defs/Position"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "position",
+        "can_transit"
+      ],
+      "title": "NodeWire",
+      "type": "object"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "description": "A node's position on the map.\n\nSNDlib names these x and y. x is longitude and y is latitude, and the\nnames are kept so the payload reads like the source data.",
+      "properties": {
+        "x": {
+          "description": "Longitude in degrees",
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "description": "Latitude in degrees",
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Position",
+      "type": "object"
+    },
+    "RankedLink": {
+      "additionalProperties": false,
+      "description": "A link load carrying its position in an ordered list.\n\nThe rank is computed server side so that the view and any table or export\nagree on the order, including how ties were broken.",
+      "properties": {
+        "capacity": {
+          "title": "Capacity",
+          "type": "number"
+        },
+        "link_id": {
+          "title": "Link Id",
+          "type": "string"
+        },
+        "load": {
+          "description": "Demand units carried, summed over all demands",
+          "title": "Load",
+          "type": "number"
+        },
+        "rank": {
+          "title": "Rank",
+          "type": "integer"
+        },
+        "utilization": {
+          "description": "load divided by capacity. 1.0 is exactly full",
+          "title": "Utilization",
+          "type": "number"
+        }
+      },
+      "required": [
+        "link_id",
+        "load",
+        "capacity",
+        "utilization",
+        "rank"
+      ],
+      "title": "RankedLink",
+      "type": "object"
+    },
+    "ScenarioReport": {
+      "additionalProperties": false,
+      "description": "The R8 answer: what breaks when these elements are down.\n\nAlso the baseline response, with an empty ``failed`` set.",
+      "properties": {
+        "components": {
+          "description": "Number of connected components among surviving nodes",
+          "title": "Components",
+          "type": "integer"
+        },
+        "endpoint_affected_demands": {
+          "description": "R8 requires these be reported separately: demands that start or end at a failed node, which are lost because their own endpoint is gone rather than because the network could not carry them.",
+          "items": {
+            "$ref": "#/$defs/StrandedDemand"
+          },
+          "title": "Endpoint Affected Demands",
+          "type": "array"
+        },
+        "failed": {
+          "$ref": "#/$defs/FailedSet"
+        },
+        "link_loads": {
+          "description": "Every surviving link, so the view can shade the whole map",
+          "items": {
+            "$ref": "#/$defs/LinkLoad"
+          },
+          "title": "Link Loads",
+          "type": "array"
+        },
+        "most_utilized": {
+          "description": "R10: the five most utilized links, ranked",
+          "items": {
+            "$ref": "#/$defs/RankedLink"
+          },
+          "title": "Most Utilized",
+          "type": "array"
+        },
+        "overloaded_links": {
+          "description": "R8: every link above 100% utilization, worst first",
+          "items": {
+            "$ref": "#/$defs/RankedLink"
+          },
+          "title": "Overloaded Links",
+          "type": "array"
+        },
+        "partitioned": {
+          "description": "R7a: whether the surviving graph is in more than one piece",
+          "title": "Partitioned",
+          "type": "boolean"
+        },
+        "totals": {
+          "$ref": "#/$defs/ScenarioTotals"
+        },
+        "undeliverable_demands": {
+          "description": "R8: demands with no remaining path, excluding the bucket below",
+          "items": {
+            "$ref": "#/$defs/StrandedDemand"
+          },
+          "title": "Undeliverable Demands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "failed",
+        "partitioned",
+        "components",
+        "link_loads",
+        "most_utilized",
+        "overloaded_links",
+        "undeliverable_demands",
+        "endpoint_affected_demands",
+        "totals"
+      ],
+      "title": "ScenarioReport",
+      "type": "object"
+    },
+    "ScenarioRequest": {
+      "additionalProperties": false,
+      "description": "POST /api/v1/scenario\n\nR7 and R8 only ask about a single failed element. This accepts a set\nbecause a set is a superset of that case, it costs nothing, and it lets\nthe view model \"fail these two and see\" without a contract change.",
+      "properties": {
+        "failed_links": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed Links",
+          "type": "array"
+        },
+        "failed_nodes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Failed Nodes",
+          "type": "array"
+        }
+      },
+      "title": "ScenarioRequest",
+      "type": "object"
+    },
+    "ScenarioTotals": {
+      "additionalProperties": false,
+      "properties": {
+        "demands": {
+          "title": "Demands",
+          "type": "integer"
+        },
+        "units": {
+          "title": "Units",
+          "type": "number"
+        },
+        "units_delivered": {
+          "title": "Units Delivered",
+          "type": "number"
+        },
+        "units_endpoint_affected": {
+          "title": "Units Endpoint Affected",
+          "type": "number"
+        },
+        "units_undeliverable": {
+          "title": "Units Undeliverable",
+          "type": "number"
+        }
+      },
+      "required": [
+        "demands",
+        "units",
+        "units_delivered",
+        "units_undeliverable",
+        "units_endpoint_affected"
+      ],
+      "title": "ScenarioTotals",
+      "type": "object"
+    },
+    "StrandedDemand": {
+      "additionalProperties": false,
+      "description": "A demand that cannot be delivered in this scenario.",
+      "properties": {
+        "endpoints": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Endpoints",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "volume": {
+          "title": "Volume",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "endpoints",
+        "volume"
+      ],
+      "title": "StrandedDemand",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "apiVersion": "v1",
+  "endpoints": {
+    "GET /api/v1/analysis/baseline": "ScenarioReport",
+    "GET /api/v1/criticality": "CriticalityResponse",
+    "GET /api/v1/network": "NetworkResponse",
+    "POST /api/v1/scenario": "ScenarioRequest"
+  },
+  "errorBody": "#/$defs/ErrorResponse",
+  "responseBodies": {
+    "GET /api/v1/analysis/baseline": "#/$defs/ScenarioReport",
+    "GET /api/v1/criticality": "#/$defs/CriticalityResponse",
+    "GET /api/v1/network": "#/$defs/NetworkResponse",
+    "POST /api/v1/scenario": "#/$defs/ScenarioReport"
+  },
+  "title": "netscope API contract"
+}

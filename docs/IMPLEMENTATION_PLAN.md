@@ -246,8 +246,11 @@ Accept: typecheck, lint and an empty test suite pass in CI.
 **P16. Map view.** Depends: P15. Delegable.
 Project coordinates with `d3-geo`, draw a faint Natural Earth outline for orientation, then
 draw links and nodes. Node glyph varies by kind. Pan, zoom and labels.
-Accept: 37 nodes and 55 links render from the fixture, sites sit next to their attachments,
-and a snapshot test guards the projection.
+Accept: the fixture network renders in full, sites sit next to their attachments, and a
+snapshot test guards the projection. Amended during P4: the committed fixture is a seven-node
+cut-down rather than the whole network, because a full fixture would have to be produced by
+the very routing code it is meant to check. The view switches to live data at P13, and the
+R1 figures are asserted against the real loaders in P7.
 
 **P17. Criticality and utilization overlays.** Depends: P16. Delegable.
 Mark critical nodes and links and the five most utilized links using at least two channels

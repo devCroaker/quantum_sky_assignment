@@ -7,7 +7,7 @@ BACKEND := backend
 FRONTEND := frontend
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-backend install-frontend lint typecheck test check dev clean
+.PHONY: help install install-backend install-frontend lint typecheck test check contract dev clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -41,6 +41,10 @@ test: ## Run both test suites
 	@if [ -f $(FRONTEND)/package.json ]; then cd $(FRONTEND) && npm test -- --run; fi
 
 check: lint typecheck test ## Everything CI runs
+
+contract: ## Regenerate the wire contract and its fixtures
+	$(VENV)/bin/python scripts/export_contract.py
+	$(VENV)/bin/python scripts/make_fixtures.py
 
 dev: ## Run the API and the front end together (the one documented command)
 	@echo "dev target lands in P19, once both halves exist"

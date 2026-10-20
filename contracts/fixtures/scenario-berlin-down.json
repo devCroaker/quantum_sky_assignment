@@ -1,0 +1,106 @@
+{
+  "components": 2,
+  "endpoint_affected_demands": [],
+  "failed": {
+    "links": [],
+    "nodes": [
+      "Berlin"
+    ]
+  },
+  "link_loads": [
+    {
+      "capacity": 200.0,
+      "link_id": "ACC-DC-NORTH-Copenhagen",
+      "load": 0.0,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 200.0,
+      "link_id": "ACC-DC-NORTH-Hamburg",
+      "load": 0.0,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 80.0,
+      "link_id": "ACC-HUB-EAST-Warsaw",
+      "load": 0.0,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 40.0,
+      "link_id": "ACC-OPS-EAST-1-HUB-EAST",
+      "load": 0.0,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L1",
+      "load": 0.0,
+      "utilization": 0.0
+    }
+  ],
+  "most_utilized": [
+    {
+      "capacity": 200.0,
+      "link_id": "ACC-DC-NORTH-Copenhagen",
+      "load": 0.0,
+      "rank": 1,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 200.0,
+      "link_id": "ACC-DC-NORTH-Hamburg",
+      "load": 0.0,
+      "rank": 2,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 80.0,
+      "link_id": "ACC-HUB-EAST-Warsaw",
+      "load": 0.0,
+      "rank": 3,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 40.0,
+      "link_id": "ACC-OPS-EAST-1-HUB-EAST",
+      "load": 0.0,
+      "rank": 4,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L1",
+      "load": 0.0,
+      "rank": 5,
+      "utilization": 0.0
+    }
+  ],
+  "overloaded_links": [],
+  "partitioned": true,
+  "totals": {
+    "demands": 2,
+    "units": 110.0,
+    "units_delivered": 0.0,
+    "units_endpoint_affected": 0.0,
+    "units_undeliverable": 110.0
+  },
+  "undeliverable_demands": [
+    {
+      "endpoints": [
+        "DC-NORTH",
+        "OPS-EAST-1"
+      ],
+      "id": "D1",
+      "volume": 10.0
+    },
+    {
+      "endpoints": [
+        "Hamburg",
+        "Warsaw"
+      ],
+      "id": "D2",
+      "volume": 100.0
+    }
+  ]
+}
