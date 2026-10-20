@@ -131,9 +131,25 @@ under R7b instead.
 needs. Since the backbone is 2-connected, no backbone city or link partitions anything, so
 under the narrower reading the partition rule would never fire and the four genuine single
 points of failure would be reported under a softer label.
-**Consequence.** Critical for the partition reason: `Dublin`, `Athens`, `Warsaw` and
-`HUB-EAST`, plus the four access links serving the single-homed sites. No backbone city or
-backbone link is critical for that reason. This resolves the first open question below.
+**Consequence, corrected on 2026-10-20 once P9 could measure it.** Critical for the
+partition reason: three nodes, `Athens`, `Dublin` and `HUB-EAST`, and three links,
+`ACC-OPS-SOUTHEAST-Athens`, `ACC-OPS-WEST-Dublin` and `ACC-OPS-EAST-1-HUB-EAST`. No backbone
+city and no backbone link is critical for that reason.
+
+The original version of this entry said four nodes and four links, including `Warsaw` and its
+access link. That was wrong, and it is the most interesting error in the project so far.
+`OPS-EAST-2` attaches to both `HUB-EAST` and `Budapest`, which accidentally gives the
+aggregation hub a second route to the backbone, so losing `Warsaw` leaves the graph in one
+piece of 36 nodes.
+
+The hub is not actually safe. `OPS-EAST-2` is an operations site and may not forward traffic
+under R6, so with `Warsaw` gone the hub's own traffic still cannot leave: two demands become
+undeliverable while the graph is unbroken. `Warsaw` is therefore critical under R7b and not
+under R7a.
+
+That distinction is the whole point of keeping R7's reasons separate. A connectivity check
+alone would call this network more resilient than it is, because it counts a path through a
+node that is not allowed to carry traffic. See also D21 on reporting reasons individually.
 
 ## D13. Parallel execution with subagents
 **Options.** Run the four lanes concurrently in separate git worktrees, pair up two tasks at
