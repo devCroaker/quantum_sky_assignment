@@ -1,0 +1,10 @@
+site_id,site_type,attaches_to,access_capacity
+DC-NORTH,data-center,Hamburg;Copenhagen,200
+DC-SOUTH,data-center,Milan;Zurich,200
+OPS-WEST,operations-site,Dublin,40
+OPS-CENTRAL,operations-site,Paris;Brussels,40
+OPS-SOUTHEAST,operations-site,Athens,40
+HUB-EAST,aggregation-hub,Warsaw,80
+OPS-EAST-1,operations-site,HUB-EAST,40
+OPS-EAST-2,operations-site,HUB-EAST;Budapest,40
+OPS-IBERIA,operations-site,Madrid;Barcelona,40
