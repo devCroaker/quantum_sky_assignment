@@ -1,19 +1,27 @@
 import baselineFixture from '@contracts/fixtures/baseline.json';
+import criticalityFixture from '@contracts/fixtures/criticality.json';
 import networkFixture from '@contracts/fixtures/network.json';
 import berlinDownFixture from '@contracts/fixtures/scenario-berlin-down.json';
 
 import type { NetworkDataSource } from './dataSource';
-import { parseNetworkResponse, parseScenarioReport } from './guards';
+import {
+  parseCriticalityResponse,
+  parseNetworkResponse,
+  parseScenarioReport,
+} from './guards';
 import type { CriticalityResponse, ScenarioReport, ScenarioRequest } from './types';
 
 /**
  * The fixture source, which is what runs today.
  *
- * contracts/fixtures/ holds three hand-worked payloads over a seven-node cut-down of the
+ * contracts/fixtures/ holds four hand-worked payloads over a seven-node cut-down of the
  * network. Two of them are scenario reports, the baseline and Berlin failed, so the
  * fixture can answer exactly two scenario requests. Anything else is rejected with a
  * message that says so, rather than quietly returning the baseline and leaving a reviewer
  * to wonder why failing Hamburg changed nothing.
+ *
+ * The criticality payload covers all fifteen elements of that network, so the panels can
+ * be built and reviewed in full before any endpoint exists.
  *
  * The fixtures go through the same guards as a live response. They are committed JSON and
  * could be trusted, but running them through the boundary means the guards are exercised
@@ -50,12 +58,7 @@ export function createFixtureDataSource(): NetworkDataSource {
       Promise.resolve(parseScenarioReport(baselineFixture, 'baseline.json')),
 
     criticality: (): Promise<CriticalityResponse> =>
-      Promise.reject(
-        new Error(
-          'criticality is not available in fixture mode: contracts/fixtures/ has no ' +
-            'CriticalityResponse payload. Run with VITE_DATA_SOURCE=live once P13 lands.',
-        ),
-      ),
+      Promise.resolve(parseCriticalityResponse(criticalityFixture, 'criticality.json')),
 
     scenario: (request: ScenarioRequest): Promise<ScenarioReport> => {
       if (isBaselineRequest(request)) {
