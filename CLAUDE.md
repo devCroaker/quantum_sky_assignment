@@ -83,10 +83,18 @@ wrong until proven otherwise.
 | Backbone articulation points / bridges | 0 / 0 |
 | Baseline undeliverable demands | 0 |
 | Baseline links above 100% | 0 |
-| Baseline peak utilization | 71.0% on Berlin to Hamburg |
+| Baseline peak utilization | 71.0% on Berlin to Hamburg, link `L12` |
+| Baseline peak load | 390.5468671679198 units of 550, not 390.5 |
 
 The backbone being 2-connected is the key structural finding: every single point of failure
-in the merged network comes from the four single-homed sites, not from the backbone.
+in the merged network comes from the added sites, not from the backbone.
+
+Three nodes partition the graph when lost, `Athens`, `Dublin` and `HUB-EAST`, along with the
+three access links serving those single-homed sites. `Warsaw` does **not**, because
+`OPS-EAST-2` attaches to both `HUB-EAST` and `Budapest` and so accidentally dual-homes the
+hub. The hub is still cut off operationally, because `OPS-EAST-2` may not forward traffic
+under R6, so `Warsaw` is critical under R7b and not under R7a. Do not assume a connectivity
+check answers the resilience question on this network.
 
 ## Testing policy
 
