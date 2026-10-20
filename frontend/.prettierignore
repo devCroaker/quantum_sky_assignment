@@ -1,0 +1,4 @@
+dist
+node_modules
+# Generated, and formatted by the generator itself.
+src/api/types.ts

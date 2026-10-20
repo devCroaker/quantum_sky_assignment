@@ -1,0 +1,174 @@
+/*
+ * Hand-rolled CSS, no framework and no component library, because every visual decision
+ * has to be explainable to the panel. The whole stylesheet is two screens long and uses
+ * one grid for the shell split.
+ */
+
+:root {
+  --ink: #16191d;
+  --ink-muted: #5c646e;
+  --paper: #ffffff;
+  --paper-sunk: #f4f5f7;
+  --rule: #d8dbe0;
+  --focus: #1b56c4;
+  --gap: 0.75rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paper-sunk);
+  color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+
+h1 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 0.95rem;
+  margin: 0 0 0.35rem;
+}
+
+/* Visible focus everywhere, since P18 makes the map keyboard-operable. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.totals {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.totals dt {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.totals dd {
+  margin: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.source-badge {
+  margin: 0 0 0 auto;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+}
+
+/*
+ * The shell split the panel decided: map two thirds, side panel one third. The side panel
+ * is never hidden and never collapses, so the three answers stay in the same place.
+ */
+.app-body {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--gap);
+  padding: var(--gap);
+  min-height: 0;
+  flex: 1;
+}
+
+.map,
+.panel-section {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.75rem;
+}
+
+.map {
+  overflow: auto;
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+  overflow: auto;
+}
+
+.placeholder-note {
+  margin: 0 0 0.5rem;
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+
+.panel-empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+}
+
+/*
+ * The node list stands in for the map until P16. It wraps rather than scrolling in one
+ * column so that 37 nodes fit without pushing the panel off screen.
+ */
+.node-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.node-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--paper-sunk);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.node-chip-id {
+  font-weight: 600;
+}
+
+.node-chip-kind {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+}
