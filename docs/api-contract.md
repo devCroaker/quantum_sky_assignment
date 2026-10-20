@@ -60,6 +60,24 @@ payload, so there is no reason to make the front end ask twice.
 whose failure strands nothing but pushes three other links to 95% is not critical under R7,
 and the operations lead still wants to see it.
 
+### 3b. R7 gives three reasons, we report four
+
+R7b makes an element critical if losing it leaves any demand undeliverable. R8 separately
+requires that demands which start or end at a failed node be reported apart from the rest.
+Whether those endpoint-affected demands count toward the R7b flag is not stated, and it
+changes the answer substantially. The panel confirmed the literal reading: they count.
+
+The cost of that reading is measured, not guessed. **36 of the 37 nodes become critical**,
+because file A is a full mesh of all 28 cities and R4 gives every site a demand. Only
+`HUB-EAST` escapes, since it forwards traffic but originates none. The `critical` flag
+therefore stops discriminating between a node whose loss splits the network and a node that
+merely sends traffic.
+
+`ENDPOINT_DEMANDS_LOST` exists as its own reason code so that the signal underneath survives.
+A reader who wants R7b as written reads `critical`. A reader who wants the genuine single
+points of failure filters for `PARTITIONS_NETWORK` or `DEMANDS_UNDELIVERABLE`. Neither has to
+recompute anything, and the API does not have to pick a side.
+
 ### 4. Ranks are computed on the server
 
 `RankedLink` carries its own `rank`. The ordering rule, highest utilization first and ties
@@ -89,6 +107,7 @@ and this way the view cannot disagree with the API about which five they are.
 | `network.json` | `NetworkResponse` | A seven-node cut-down of the real network |
 | `baseline.json` | `ScenarioReport` | That network with nothing failed |
 | `scenario-berlin-down.json` | `ScenarioReport` | That network with Berlin failed |
+| `criticality.json` | `CriticalityResponse` | All 15 elements of that network assessed |
 
 They exist for two reasons. The front end lane builds its entire view against them before
 any endpoint exists. And their numbers are worked out by hand, in the docstring of the
@@ -99,6 +118,21 @@ the code being wrong.
 The fixture network uses real SNDlib coordinates for its four cities, so the map renders in
 the right place. It is not the real network and is not a substitute for the R1 acceptance
 check.
+
+The criticality fixture came from a separate brute-force implementation written before
+netscope had any routing code, so it shares nothing with the module it will be used to check.
+Its credential is that the same implementation reproduces all eight hand-derived baseline
+link loads exactly, including the 105 over 550 that is the only value here which is not
+round. Eight of the fifteen scenarios were then checked by hand.
+
+Two things that fixture cannot show, stated so their absence is not mistaken for a result.
+**No single failure in it overloads any link**, because the backbone links are 550 and the
+largest demand is 100, so R7c never fires there and is exercised against the real network
+instead, where the baseline peak is 71 percent. And because losing a link never removes a
+node, no link scenario has an endpoint-affected demand.
+
+At fixture scale the literal R7b reading shows its shape clearly: 6 of 7 nodes are critical
+and only `Copenhagen` is not, mirroring the 36 of 37 in the real network.
 
 ## What v1 deliberately omits
 

@@ -55,7 +55,35 @@ describe('the fixture data source', () => {
     );
   });
 
-  it('rejects criticality, which has no committed fixture', async () => {
-    await expect(source.criticality()).rejects.toThrow(/not available in fixture mode/);
+  it('returns the criticality fixture for all fifteen elements', async () => {
+    const report = await source.criticality();
+    expect(report.assessments).toHaveLength(15);
+    expect(report.summary.nodes_evaluated).toBe(7);
+    expect(report.summary.links_evaluated).toBe(8);
+  });
+
+  it('reports six critical nodes and three critical links', async () => {
+    // Six of seven, because the panel confirmed the literal reading of R7b
+    // under which a node that is merely an endpoint of a lost demand counts.
+    // Copenhagen is the only node that survives that test.
+    const report = await source.criticality();
+    expect(report.summary.critical_nodes).toBe(6);
+    expect(report.summary.critical_links).toBe(3);
+    const safeNodes = report.assessments
+      .filter((a) => a.kind === 'node' && !a.critical)
+      .map((a) => a.id);
+    expect(safeNodes).toEqual(['Copenhagen']);
+  });
+
+  it('keeps the endpoint-only reason distinguishable from a real routing failure', async () => {
+    // This is what preserves the discriminating signal under the literal
+    // reading: a panel can filter these three out to see the genuine single
+    // points of failure.
+    const report = await source.criticality();
+    const endpointOnly = report.assessments
+      .filter((a) => a.reasons?.length === 1 && a.reasons[0] === 'endpoint-demands-lost')
+      .map((a) => a.id)
+      .sort();
+    expect(endpointOnly).toEqual(['DC-NORTH', 'Hamburg', 'OPS-EAST-1']);
   });
 });
