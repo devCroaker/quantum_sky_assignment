@@ -52,6 +52,7 @@ export function NodeGlyph({
   x,
   y,
   label,
+  labelSide = 'right',
 }: {
   id: string;
   kind: NodeKind;
@@ -59,6 +60,13 @@ export function NodeGlyph({
   y: number;
   /** Whether to draw the text label next to the glyph. */
   label: boolean;
+  /**
+   * Which side of the glyph the label sits on. A label is drawn to the right by
+   * default, which runs it off the canvas for a node near the right edge. The
+   * caller flips the side rather than this component guessing, because only the
+   * caller knows the width it is drawing into.
+   */
+  labelSide?: 'left' | 'right';
 }): JSX.Element {
   return (
     <g
@@ -75,7 +83,12 @@ export function NodeGlyph({
       </title>
       <ShapePath kind={kind} />
       {label ? (
-        <text className="node-label" x={GLYPH_SIZE + 4} y={4}>
+        <text
+          className="node-label"
+          x={labelSide === 'left' ? -(GLYPH_SIZE + 4) : GLYPH_SIZE + 4}
+          y={4}
+          textAnchor={labelSide === 'left' ? 'end' : 'start'}
+        >
           {id}
         </text>
       ) : null}

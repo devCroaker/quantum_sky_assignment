@@ -3,20 +3,21 @@ import { useEffect, useRef } from 'react';
 
 import type { NodeWire } from '../api/types';
 import { kindLabelFor } from './nodeKind';
+import { placePopover } from './popoverPlacement';
 
 /**
  * The reviewer's cluster popover (not a plan requirement; recorded in the task brief
  * rather than in docs/DECISIONS.md, since that document is reserved for decisions the
  * panel or the tool made about the plan itself).
  *
- * Positioned as a percentage of the map's own box (`anchorXPercent`/`anchorYPercent`),
+ * Positioned from the marker's measured offset within the map canvas, in pixels,
  * which is why it works at any rendered size without a ResizeObserver: the percentage is
  * computed from the same `viewBox` coordinates the SVG draws in.
  */
 export function ClusterPopover({
   nodes,
-  anchorXPercent,
-  anchorYPercent,
+  anchorLeftPx,
+  anchorTopPx,
   onClose,
   onSelectNode,
   onRequestReturnFocus,
@@ -24,8 +25,8 @@ export function ClusterPopover({
   onMouseLeave,
 }: {
   nodes: readonly NodeWire[];
-  anchorXPercent: number;
-  anchorYPercent: number;
+  anchorLeftPx: number;
+  anchorTopPx: number;
   onClose: () => void;
   onSelectNode: (id: string) => void;
   /**
@@ -53,25 +54,34 @@ export function ClusterPopover({
     itemRefs.current[0]?.focus();
   }, []);
 
-  // Flip to the left/above the anchor when the popover would otherwise run off the
-  // viewport, measured against the map container rather than the window, since that is
-  // the box the percentages above are relative to.
+  // Keep the popover beside its anchor and inside the map.
+  //
+  // The obvious way to handle an overflow is to flip to `right: 0` or
+  // `bottom: 100%`, but those are relative to the positioned ancestor, not to
+  // the anchor, so they throw the anchor away: a marker in the bottom right
+  // corner ended up with its popover pinned to the top of the map, hundreds of
+  // pixels from the node it describes. So this places the popover on the other
+  // side of the anchor instead, and only then clamps it into the container.
+  //
+  // Styles are written to the DOM rather than held in state because the
+  // measurement depends on the rendered size of this element, which is not
+  // known until after it has been laid out.
   useEffect(() => {
     const el = containerRef.current;
     if (el === null) return;
     const parent = el.offsetParent;
     if (!(parent instanceof HTMLElement)) return;
-    const parentRect = parent.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    if (elRect.right > parentRect.right) {
-      el.style.left = 'auto';
-      el.style.right = '0.5rem';
-    }
-    if (elRect.bottom > parentRect.bottom) {
-      el.style.top = 'auto';
-      el.style.bottom = '100%';
-    }
-  }, []);
+    const { left, top } = placePopover({
+      anchorLeftPx,
+      anchorTopPx,
+      width: el.offsetWidth,
+      height: el.offsetHeight,
+      containerWidth: parent.clientWidth,
+      containerHeight: parent.clientHeight,
+    });
+    el.style.left = `${String(left)}px`;
+    el.style.top = `${String(top)}px`;
+  }, [anchorLeftPx, anchorTopPx]);
 
   function focusIndex(index: number): void {
     const bounded = (index + nodes.length) % nodes.length;
@@ -109,7 +119,7 @@ export function ClusterPopover({
       className="cluster-popover"
       role="menu"
       aria-label={`${String(nodes.length)} nodes at this position`}
-      style={{ left: `${String(anchorXPercent)}%`, top: `${String(anchorYPercent)}%` }}
+      style={{ left: `${String(anchorLeftPx)}px`, top: `${String(anchorTopPx)}px` }}
       onKeyDown={onKeyDown}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

@@ -9,6 +9,15 @@ import { CLUSTER_THRESHOLD_PX, clusterByProximity } from './clustering';
 import { landFeatures } from './landOutline';
 import { NodeGlyph } from './NodeGlyph';
 import { createProjection, MAP_HEIGHT, MAP_WIDTH } from './projection';
+
+/**
+ * How close to the right edge a node must be before its label is drawn on the
+ * other side. The longest id in the real data is OPS-SOUTHEAST, and at the label
+ * font size that is comfortably under this width, so a flipped label stays on
+ * the canvas. Without this a node near the right edge has its label clipped,
+ * which is visible on first load before anyone has panned anywhere.
+ */
+const LABEL_FLIP_MARGIN = 150;
 import { useZoomPan } from './useZoomPan';
 
 /**
@@ -50,10 +59,13 @@ interface Projected extends ScreenPoint {
  */
 export function MapView({ network }: { network: NetworkResponse }): JSX.Element {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
   const { transform, onKeyDown } = useZoomPan(svgRef);
   const [openClusterKey, setOpenClusterKey] = useState<string | null>(null);
   const markerRefs = useRef(new Map<string, SVGGElement | null>());
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Escape closes the popover and hands focus back to its marker. That focus() call
   // raises a native focus event on an element whose onFocus normally *opens* the
   // popover, which would otherwise reopen it the instant it closed. This flag tells the
@@ -75,9 +87,28 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
     }, CLOSE_DELAY_MS);
   }, [cancelClose]);
 
+  // Measure the marker here rather than in an effect, because the element is
+  // already in hand and a layout effect that calls setState triggers a cascading
+  // render that the lint rules rightly object to.
+  //
+  // The anchor is measured rather than derived from the marker's viewBox
+  // coordinates as a percentage of the canvas. Those are not the same thing: the
+  // SVG preserves its aspect ratio, so whenever the canvas is a different shape
+  // from the 960 by 640 viewBox the drawing is letterboxed inside it and a
+  // percentage of the canvas lands somewhere the marker is not. Measuring also
+  // makes the anchor correct under the zoom transform for free.
   const openNow = useCallback(
-    (key: string) => {
+    (key: string, marker: SVGGElement | null) => {
       cancelClose();
+      const canvas = canvasRef.current;
+      if (marker !== null && canvas !== null) {
+        const markerBox = marker.getBoundingClientRect();
+        const canvasBox = canvas.getBoundingClientRect();
+        setAnchor({
+          left: markerBox.left - canvasBox.left + markerBox.width / 2,
+          top: markerBox.top - canvasBox.top + markerBox.height / 2,
+        });
+      }
       setOpenClusterKey(key);
     },
     [cancelClose],
@@ -135,7 +166,7 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
         Pan: drag or arrow keys. Zoom: scroll, pinch, or +/-. Hover or focus a node that
         shows a count badge to see every node at that position.
       </p>
-      <div className="map-canvas">
+      <div className="map-canvas" ref={canvasRef}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${String(MAP_WIDTH)} ${String(MAP_HEIGHT)}`}
@@ -184,6 +215,9 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
                       label={
                         shouldAlwaysLabel(only.node.kind) || transform.k > CITY_LABEL_ZOOM
                       }
+                      labelSide={
+                        base.x > MAP_WIDTH - LABEL_FLIP_MARGIN ? 'left' : 'right'
+                      }
                     />
                   );
                 }
@@ -205,16 +239,16 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
                     aria-haspopup="menu"
                     aria-expanded={openClusterKey === key}
                     aria-label={`${String(cluster.members.length)} nodes at this position`}
-                    onMouseEnter={() => {
-                      openNow(key);
+                    onMouseEnter={(event) => {
+                      openNow(key, event.currentTarget);
                     }}
                     onMouseLeave={scheduleClose}
-                    onFocus={() => {
+                    onFocus={(event) => {
                       if (suppressNextMarkerFocus.current) {
                         suppressNextMarkerFocus.current = false;
                         return;
                       }
-                      openNow(key);
+                      openNow(key, event.currentTarget);
                     }}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') setOpenClusterKey(null);
@@ -236,11 +270,11 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
             </g>
           </g>
         </svg>
-        {openCluster !== undefined ? (
+        {openCluster !== undefined && anchor !== null ? (
           <ClusterPopover
             nodes={openCluster.members.map((member) => member.node)}
-            anchorXPercent={(openCluster.x / MAP_WIDTH) * 100}
-            anchorYPercent={(openCluster.y / MAP_HEIGHT) * 100}
+            anchorLeftPx={anchor.left}
+            anchorTopPx={anchor.top}
             onClose={() => {
               setOpenClusterKey(null);
             }}
