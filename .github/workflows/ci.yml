@@ -20,10 +20,14 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install
-        run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e "backend[dev]"
+      - name: Install from the lockfile
+        # --locked fails if backend/uv.lock and pyproject.toml disagree, so a
+        # dependency change cannot reach main without its lockfile. That is
+        # also what makes the audit jobs in security.yml meaningful: they
+        # report on the versions that actually get installed.
+        env:
+          UV_PROJECT_ENVIRONMENT: .venv
+        run: uv sync --project backend --extra dev --locked
       - name: Lint
         run: |
           .venv/bin/ruff check backend

@@ -39,14 +39,15 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install
-        run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e "backend[dev]"
-      - name: Audit installed Python dependencies
-        # Audits the resolved environment, not the version ranges in pyproject.toml, so it
-        # sees the transitive tree that actually gets installed. No --ignore-vuln entries:
-        # a finding fails the job and a human decides what to do about it.
+      - name: Install from the lockfile
+        env:
+          UV_PROJECT_ENVIRONMENT: .venv
+        run: uv sync --project backend --extra dev --locked
+      - name: Audit the locked Python dependencies
+        # Audits the installed environment, which --locked guarantees is exactly what
+        # backend/uv.lock pins. Before the lockfile existed this job reported on whatever
+        # resolved that morning, so a green run described a day rather than an artefact.
+        # No --ignore-vuln entries: a finding fails the job and a human decides.
         #
         # --skip-editable drops netscope itself, which is installed from the working tree and
         # has no PyPI release to look up. --strict is not used because it turns that one
@@ -135,16 +136,16 @@ jobs:
         if: steps.probe.outputs.present == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        # Snyk reads a requirements file for Python, and this project declares ranges in
-        # pyproject.toml with no lockfile, so the resolved environment is frozen to a
-        # throwaway requirements file outside the tree and scanned. That keeps the scan on
-        # the versions that would actually be installed, and commits nothing.
+        # Snyk reads a requirements file for Python, so the lockfile is exported to one
+        # outside the tree. uv export emits hashes, and --no-emit-project drops netscope
+        # itself, which has no PyPI release. Nothing is committed, and the exported versions
+        # are exactly what uv.lock pins rather than a fresh resolution.
         run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e "backend[dev]"
-          uv pip freeze --python .venv/bin/python \
-            | grep -v "^-e " \
-            | grep -v "^netscope" > "$RUNNER_TEMP/requirements.txt"
+          uv export --project backend \
+            --format requirements-txt \
+            --extra dev \
+            --no-emit-project \
+            --locked > "$RUNNER_TEMP/requirements.txt"
           snyk test \
             --file="$RUNNER_TEMP/requirements.txt" \
             --package-manager=pip \
