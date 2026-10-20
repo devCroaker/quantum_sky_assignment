@@ -73,6 +73,7 @@ def build_state(
             load_backbone(Path(settings.sndlib_path)),
             sites,
             sites_file=settings.sites_path,
+            backbone_capacity=settings.backbone_capacity,
         )
     else:
         built_network = network

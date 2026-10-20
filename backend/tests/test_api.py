@@ -299,3 +299,31 @@ class TestMalformedInputAtStartup:
         assert not any("Traceback" in message for message in messages)
         for record in caplog.records:
             assert record.exc_info is None
+
+
+def test_the_documented_backbone_capacity_setting_actually_reaches_the_merge(
+    tmp_path: Path,
+) -> None:
+    """NETSCOPE_BACKBONE_CAPACITY was documented but inert until now.
+
+    R3 fixes the backbone at 550 and that stays the default, so nothing about
+    the shipped behaviour changes. The point of the test is the failure mode
+    it prevents: a setting listed in .env.example that silently does nothing
+    is worse than no setting, because a reader believes it works and a
+    reviewer has no way to tell from the outside.
+    """
+    settings = Settings(
+        sndlib_path=str(ROOT / "data" / "nobel-eu.xml"),
+        sites_path=str(ROOT / "data" / "sites.csv"),
+        backbone_capacity=800.0,
+    )
+    with TestClient(create_app(settings=settings)) as client:
+        payload = client.get("/api/v1/network").json()
+
+    backbone = [link for link in payload["links"] if link["kind"] == "backbone"]
+    access = [link for link in payload["links"] if link["kind"] == "access"]
+    assert len(backbone) == 41
+    assert {link["capacity"] for link in backbone} == {800.0}
+    # Access links take their capacity from the site row, so the setting must
+    # not touch them. 200 for the data centers, 80 for the hub, 40 per site.
+    assert {link["capacity"] for link in access} == {200.0, 80.0, 40.0}
