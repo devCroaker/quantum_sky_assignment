@@ -20,8 +20,10 @@ one is wrong, raise it, do not silently diverge.
    derived from the brief, computed by the code, or worked out by hand with the working
    shown. If you cannot source a number, say that you cannot.
 2. **Never commit a credential.** No keys, tokens or passwords, not even placeholders that
-   look real. Configuration comes from the environment, with `.env.example` as the only
-   committed template.
+   look real. Configuration comes from the environment. The committed templates are
+   `.env.example` for the back end and `frontend/.env.example` for the front end, which are
+   separate because Vite only reads variables from its own directory and only those prefixed
+   `VITE_`. Both hold names and safe defaults, never a secret.
 3. **No network calls at runtime.** The application reads committed input files. Input data
    is fetched once, by a human, and committed with provenance.
 4. **Quality gates are not optional.** `make check` must pass before any commit. It runs
