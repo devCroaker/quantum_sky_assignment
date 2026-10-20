@@ -54,6 +54,28 @@ other. Both demands cross the break and neither has an endpoint at Berlin, so
 both are undeliverable rather than endpoint-affected, and every surviving
 link drops to zero.
 
+Criticality, worked out independently.
+
+The fifteen assessments in CRITICALITY below (seven nodes, eight links) were
+produced by a separate brute-force implementation written before netscope had
+any routing code at all, so it shares nothing with the module it will later be
+used to check. That implementation enumerates every minimum-hop path and
+divides, which is the naive reading of R5.
+
+Its credential is the baseline above: run over this same network with nothing
+failed, it reproduces all eight hand-derived link loads exactly, including the
+105 over 550 that is the only value here that is not round. Eight of the
+fifteen scenarios were then checked by hand against it, including every case
+that partitions the network.
+
+Two things the fixture network cannot show, stated so nobody mistakes their
+absence for a result. No single failure here overloads any link, because the
+backbone links are 550 and the largest demand is 100, so R7c never fires and
+every max_utilization below is well under 1.0. R7c is exercised against the
+real network instead, where the baseline peak is 71 percent and single
+failures do push links over. And because links never remove nodes, no link
+scenario has an endpoint-affected demand.
+
 Run with: python scripts/make_fixtures.py
 """
 
@@ -65,7 +87,13 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from netscope.api.schemas import (
+    Assessment,
+    CriticalityReason,
+    CriticalityResponse,
+    CriticalitySummary,
+    ElementKind,
     FailedSet,
+    FailureImpact,
     LinkLoad,
     LinkWire,
     NetworkResponse,
@@ -231,12 +259,91 @@ def berlin_down() -> ScenarioReport:
     )
 
 
+#: Fifteen assessments, derived by the independent implementation described in
+#: the module docstring and spot-checked by hand. Tuple order is:
+#: reasons, components, undeliverable demands and units, endpoint-affected
+#: demands and units, overloaded links, highest surviving utilization.
+#:
+#: Six of the seven nodes are critical and only Copenhagen is not, which is
+#: the fixture-scale version of what R7b's literal reading does to the real
+#: network. Three of the eight links are critical.
+CRITICALITY: dict[tuple[str, str], tuple[tuple[str, ...], int, int, float, int, float, int, float]] = {
+    # Berlin carries every path between the two halves of this network.
+    ("node", "Berlin"): (("partitions-network", "demands-undeliverable"), 2, 2, 110.0, 0, 0.0, 0, 0.0),
+    # The only element of either kind that is not critical. Losing it leaves
+    # both demands deliverable over their remaining minimum-hop paths.
+    ("node", "Copenhagen"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
+    # Critical only because it is an endpoint of D1, per R7b as written.
+    ("node", "DC-NORTH"): (("endpoint-demands-lost",), 1, 0, 0.0, 1, 10.0, 0, 100.0 / 550.0),
+    ("node", "HUB-EAST"): (("partitions-network", "demands-undeliverable"), 2, 1, 10.0, 0, 0.0, 0, 100.0 / 550.0),
+    ("node", "Hamburg"): (("endpoint-demands-lost",), 1, 0, 0.0, 1, 100.0, 0, 0.25),
+    ("node", "OPS-EAST-1"): (("endpoint-demands-lost",), 1, 0, 0.0, 1, 10.0, 0, 100.0 / 550.0),
+    # The only element that fires three reasons at once: it partitions the
+    # network, strands D1 between two survivors, and is itself an endpoint
+    # of D2.
+    ("node", "Warsaw"): (
+        ("partitions-network", "demands-undeliverable", "endpoint-demands-lost"),
+        2, 1, 10.0, 1, 100.0, 0, 0.0,
+    ),
+    # DC-NORTH is dual-homed, so losing either access link costs nothing.
+    ("link", "ACC-DC-NORTH-Copenhagen"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
+    ("link", "ACC-DC-NORTH-Hamburg"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
+    # The two single-homed access links. Each one isolates a site.
+    ("link", "ACC-HUB-EAST-Warsaw"): (("partitions-network", "demands-undeliverable"), 2, 1, 10.0, 0, 0.0, 0, 100.0 / 550.0),
+    ("link", "ACC-OPS-EAST-1-HUB-EAST"): (("partitions-network", "demands-undeliverable"), 2, 1, 10.0, 0, 0.0, 0, 100.0 / 550.0),
+    # The three backbone links in the western triangle all have an
+    # alternative, so none is critical.
+    ("link", "L1"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
+    ("link", "L2"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
+    ("link", "L3"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
+    # The one backbone link with no alternative: it is the only path east.
+    ("link", "L4"): (("partitions-network", "demands-undeliverable"), 2, 2, 110.0, 0, 0.0, 0, 0.0),
+}
+
+
+def criticality() -> CriticalityResponse:
+    """Every node and every link, critical or not, per the contract."""
+    assessments = []
+    for (kind, element_id), row in CRITICALITY.items():
+        reasons, components, und_n, und_u, ep_n, ep_u, over_n, max_util = row
+        assessments.append(
+            Assessment(
+                kind=ElementKind(kind),
+                id=element_id,
+                critical=bool(reasons),
+                reasons=tuple(CriticalityReason(r) for r in reasons),
+                impact=FailureImpact(
+                    components=components,
+                    undeliverable_demands=und_n,
+                    undeliverable_units=und_u,
+                    endpoint_affected_demands=ep_n,
+                    endpoint_affected_units=ep_u,
+                    overloaded_links=over_n,
+                    max_utilization=max_util,
+                ),
+            )
+        )
+    assessments.sort(key=lambda a: (a.kind.value, a.id))
+    nodes = [a for a in assessments if a.kind is ElementKind.NODE]
+    links = [a for a in assessments if a.kind is ElementKind.LINK]
+    return CriticalityResponse(
+        assessments=tuple(assessments),
+        summary=CriticalitySummary(
+            nodes_evaluated=len(nodes),
+            links_evaluated=len(links),
+            critical_nodes=sum(1 for a in nodes if a.critical),
+            critical_links=sum(1 for a in links if a.critical),
+        ),
+    )
+
+
 def main() -> int:
     TARGET.mkdir(parents=True, exist_ok=True)
     written: dict[str, BaseModel] = {
         "network.json": network(),
         "baseline.json": baseline(),
         "scenario-berlin-down.json": berlin_down(),
+        "criticality.json": criticality(),
     }
     for name, model in written.items():
         payload = json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"

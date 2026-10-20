@@ -11,11 +11,24 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    # Mondays at 04:17 UTC. A dependency becomes vulnerable while the code sits still, so a
-    # pull-request-only trigger never catches the advisory published the week after a merge.
-    # The odd minute keeps the run off the top of the hour, where GitHub queues are longest.
-    - cron: "17 4 * * 1"
+  # Run on demand from the Actions tab, or with: gh workflow run Security
+  workflow_dispatch:
+
+  # The scheduled trigger is written and deliberately left commented out.
+  #
+  # It is the one trigger that catches an advisory published the week after a
+  # merge, because a dependency becomes vulnerable while the code sits still
+  # and nothing about the repository changes. On a long-lived service it should
+  # be on. It is off here because this repository is short-lived and a weekly
+  # cron on a quiet repository produces runs nobody reads, which is how a
+  # failing security job comes to be ignored.
+  #
+  # To enable it, uncomment the two lines below. Mondays at 04:17 UTC, with the
+  # odd minute keeping the run off the top of the hour where GitHub's queues
+  # are longest.
+  #
+  # schedule:
+  #   - cron: "17 4 * * 1"
 
 permissions:
   contents: read
@@ -39,14 +52,19 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install
-        run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e "backend[dev]"
-      - name: Audit installed Python dependencies
-        # Audits the resolved environment, not the version ranges in pyproject.toml, so it
-        # sees the transitive tree that actually gets installed. No --ignore-vuln entries:
-        # a finding fails the job and a human decides what to do about it.
+      - name: Install from the lockfile
+        env:
+          # Absolute, because uv resolves a relative UV_PROJECT_ENVIRONMENT
+          # against the --project directory and would put the virtualenv in
+          # backend/ while every later step looks for it at the repository
+          # root. The Makefile passes $(CURDIR) for the same reason.
+          UV_PROJECT_ENVIRONMENT: ${{ github.workspace }}/.venv
+        run: uv sync --project backend --extra dev --locked
+      - name: Audit the locked Python dependencies
+        # Audits the installed environment, which --locked guarantees is exactly what
+        # backend/uv.lock pins. Before the lockfile existed this job reported on whatever
+        # resolved that morning, so a green run described a day rather than an artefact.
+        # No --ignore-vuln entries: a finding fails the job and a human decides.
         #
         # --skip-editable drops netscope itself, which is installed from the working tree and
         # has no PyPI release to look up. --strict is not used because it turns that one
@@ -95,10 +113,14 @@ jobs:
     steps:
       - name: Check for a Snyk token
         id: probe
-        # The token is optional by design. This repository holds no credential, forks do not
-        # inherit secrets, and a clone without the secret must still get a green workflow. A
-        # job that fails on every fork is worse than no job, so the token is probed once here
-        # and every later step is gated on the result.
+        # SNYK_TOKEN is now configured as a repository secret, so this job runs for real on
+        # every pull request and push to main. The probe stays because a secret is not always
+        # there: GitHub does not pass secrets to workflows triggered from a fork, and a fresh
+        # clone of this repository has none. A job that fails in those cases is worse than no
+        # job, so the token is probed once here and every later step is gated on the result.
+        #
+        # The probe reads the secret into an env var rather than testing the expression
+        # directly, because a secret is unavailable to an `if:` condition at the job level.
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -133,21 +155,42 @@ jobs:
         run: npm install --global snyk@1
       - name: Scan the back end
         if: steps.probe.outputs.present == 'true'
+        # Snyk reads a requirements file for Python, so the lockfile is exported to one
+        # outside the tree. --no-emit-project drops netscope itself, which has no PyPI
+        # release. Nothing is committed, and the exported versions are exactly what
+        # uv.lock pins rather than a fresh resolution.
+        #
+        # Three details are needed to make Snyk's pip scanner work here, each of which
+        # cost a failed run to find:
+        #
+        #   --no-hashes       uv export writes hashes by default. Snyk's pip parser does
+        #                     not want them and they carry no information it uses, since
+        #                     it matches on name and version.
+        #   --command         Snyk resolves the dependency tree through a real Python
+        #                     interpreter rather than from the file alone. Without being
+        #                     told which one, it fails with "Missing required packages"
+        #                     (SNYK-OS-PYTHON-0013) even though every version is pinned.
+        #                     That is why the environment is installed first.
+        #   --skip-unresolved Snyk's own documented remedy for the same error. Kept as a
+        #                     belt-and-braces measure: a package it cannot resolve is
+        #                     skipped rather than failing the run. pip-audit covers the
+        #                     same tree with no such caveat, so a skip here is not a hole.
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        # Snyk reads a requirements file for Python, and this project declares ranges in
-        # pyproject.toml with no lockfile, so the resolved environment is frozen to a
-        # throwaway requirements file outside the tree and scanned. That keeps the scan on
-        # the versions that would actually be installed, and commits nothing.
+          UV_PROJECT_ENVIRONMENT: ${{ github.workspace }}/.venv
         run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e "backend[dev]"
-          uv pip freeze --python .venv/bin/python \
-            | grep -v "^-e " \
-            | grep -v "^netscope" > "$RUNNER_TEMP/requirements.txt"
+          uv sync --project backend --extra dev --locked
+          uv export --project backend \
+            --format requirements-txt \
+            --extra dev \
+            --no-emit-project \
+            --no-hashes \
+            --locked > "$RUNNER_TEMP/requirements.txt"
           snyk test \
             --file="$RUNNER_TEMP/requirements.txt" \
             --package-manager=pip \
+            --command="${{ github.workspace }}/.venv/bin/python" \
+            --skip-unresolved \
             --severity-threshold=high
       - name: Probe for the front end
         if: steps.probe.outputs.present == 'true'

@@ -1,0 +1,260 @@
+{
+  "assessments": [
+    {
+      "critical": false,
+      "id": "ACC-DC-NORTH-Copenhagen",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.25,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "link",
+      "reasons": []
+    },
+    {
+      "critical": false,
+      "id": "ACC-DC-NORTH-Hamburg",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.25,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "link",
+      "reasons": []
+    },
+    {
+      "critical": true,
+      "id": "ACC-HUB-EAST-Warsaw",
+      "impact": {
+        "components": 2,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.18181818181818182,
+        "overloaded_links": 0,
+        "undeliverable_demands": 1,
+        "undeliverable_units": 10.0
+      },
+      "kind": "link",
+      "reasons": [
+        "partitions-network",
+        "demands-undeliverable"
+      ]
+    },
+    {
+      "critical": true,
+      "id": "ACC-OPS-EAST-1-HUB-EAST",
+      "impact": {
+        "components": 2,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.18181818181818182,
+        "overloaded_links": 0,
+        "undeliverable_demands": 1,
+        "undeliverable_units": 10.0
+      },
+      "kind": "link",
+      "reasons": [
+        "partitions-network",
+        "demands-undeliverable"
+      ]
+    },
+    {
+      "critical": false,
+      "id": "L1",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.25,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "link",
+      "reasons": []
+    },
+    {
+      "critical": false,
+      "id": "L2",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.25,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "link",
+      "reasons": []
+    },
+    {
+      "critical": false,
+      "id": "L3",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.25,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "link",
+      "reasons": []
+    },
+    {
+      "critical": true,
+      "id": "L4",
+      "impact": {
+        "components": 2,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.0,
+        "overloaded_links": 0,
+        "undeliverable_demands": 2,
+        "undeliverable_units": 110.0
+      },
+      "kind": "link",
+      "reasons": [
+        "partitions-network",
+        "demands-undeliverable"
+      ]
+    },
+    {
+      "critical": true,
+      "id": "Berlin",
+      "impact": {
+        "components": 2,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.0,
+        "overloaded_links": 0,
+        "undeliverable_demands": 2,
+        "undeliverable_units": 110.0
+      },
+      "kind": "node",
+      "reasons": [
+        "partitions-network",
+        "demands-undeliverable"
+      ]
+    },
+    {
+      "critical": false,
+      "id": "Copenhagen",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.25,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "node",
+      "reasons": []
+    },
+    {
+      "critical": true,
+      "id": "DC-NORTH",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 1,
+        "endpoint_affected_units": 10.0,
+        "max_utilization": 0.18181818181818182,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "node",
+      "reasons": [
+        "endpoint-demands-lost"
+      ]
+    },
+    {
+      "critical": true,
+      "id": "HUB-EAST",
+      "impact": {
+        "components": 2,
+        "endpoint_affected_demands": 0,
+        "endpoint_affected_units": 0.0,
+        "max_utilization": 0.18181818181818182,
+        "overloaded_links": 0,
+        "undeliverable_demands": 1,
+        "undeliverable_units": 10.0
+      },
+      "kind": "node",
+      "reasons": [
+        "partitions-network",
+        "demands-undeliverable"
+      ]
+    },
+    {
+      "critical": true,
+      "id": "Hamburg",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 1,
+        "endpoint_affected_units": 100.0,
+        "max_utilization": 0.25,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "node",
+      "reasons": [
+        "endpoint-demands-lost"
+      ]
+    },
+    {
+      "critical": true,
+      "id": "OPS-EAST-1",
+      "impact": {
+        "components": 1,
+        "endpoint_affected_demands": 1,
+        "endpoint_affected_units": 10.0,
+        "max_utilization": 0.18181818181818182,
+        "overloaded_links": 0,
+        "undeliverable_demands": 0,
+        "undeliverable_units": 0.0
+      },
+      "kind": "node",
+      "reasons": [
+        "endpoint-demands-lost"
+      ]
+    },
+    {
+      "critical": true,
+      "id": "Warsaw",
+      "impact": {
+        "components": 2,
+        "endpoint_affected_demands": 1,
+        "endpoint_affected_units": 100.0,
+        "max_utilization": 0.0,
+        "overloaded_links": 0,
+        "undeliverable_demands": 1,
+        "undeliverable_units": 10.0
+      },
+      "kind": "node",
+      "reasons": [
+        "partitions-network",
+        "demands-undeliverable",
+        "endpoint-demands-lost"
+      ]
+    }
+  ],
+  "summary": {
+    "critical_links": 3,
+    "critical_nodes": 6,
+    "links_evaluated": 8,
+    "nodes_evaluated": 7
+  }
+}

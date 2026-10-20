@@ -7,7 +7,7 @@ BACKEND := backend
 FRONTEND := frontend
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-backend install-frontend lint typecheck test check contract dev clean
+.PHONY: help install install-backend install-frontend lint typecheck test check contract lock lock-check dev clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -15,10 +15,13 @@ help: ## Show the available targets
 
 install: install-backend install-frontend ## Install both halves
 
-install-backend: ## Create the virtualenv and install the back end
+install-backend: ## Install the back end from the committed lockfile
 	@command -v uv >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/"; exit 1; }
-	uv venv --python 3.12 $(VENV) 2>/dev/null || uv venv $(VENV)
-	uv pip install --python $(PY) -e "$(BACKEND)[dev]"
+# --locked fails rather than re-resolving if backend/uv.lock disagrees with
+# pyproject.toml, so a dependency change cannot land without its lockfile.
+# UV_PROJECT_ENVIRONMENT keeps the virtualenv at the repository root, where
+# every other target already expects it.
+	UV_PROJECT_ENVIRONMENT=$(CURDIR)/$(VENV) uv sync --project $(BACKEND) --extra dev --locked
 
 install-frontend: ## Install the front end, once it exists
 	@if [ -f $(FRONTEND)/package.json ]; then \
@@ -40,7 +43,13 @@ test: ## Run both test suites
 	cd $(BACKEND) && ../$(VENV)/bin/pytest
 	@if [ -f $(FRONTEND)/package.json ]; then cd $(FRONTEND) && npm test -- --run; fi
 
-check: lint typecheck test ## Everything CI runs
+check: lock-check lint typecheck test ## Everything CI runs
+
+lock: ## Re-resolve backend/uv.lock after editing dependencies
+	cd $(BACKEND) && uv lock
+
+lock-check: ## Fail if the lockfile and pyproject.toml disagree
+	cd $(BACKEND) && uv lock --check
 
 contract: ## Regenerate the wire contract and its fixtures
 	$(VENV)/bin/python scripts/export_contract.py
