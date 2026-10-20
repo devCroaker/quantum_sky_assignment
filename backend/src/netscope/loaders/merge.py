@@ -19,10 +19,10 @@ place R4 itself does: the data center pair demand needs exactly two data
 centers, and anything else is rejected rather than guessed at.
 
 **Site coordinates.** ``Node`` requires a position and the site table has
-none, so each site is placed at the centroid of the nodes it attaches to.
-That has a real dependency order, because ``OPS-EAST-1`` attaches to
-``HUB-EAST``, which is itself a site, so placement is resolved iteratively
-and a circular chain of attachments is rejected.
+none, so every site is positioned by ``geometry.place_sites``, which
+resolves the attachments in dependency order and rejects a circular chain.
+The rule itself lives there and not here, because it is geometry rather
+than merging. See D9 and D22.
 
 **Validation (R2).** Attachment targets are checked by
 ``sites_csv.resolve``. Beyond that this module rejects a ``site_id`` that
@@ -37,11 +37,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from netscope.errors import InputError
-from netscope.loaders import sites_csv
+from netscope.loaders import geometry, sites_csv
 from netscope.loaders.sites_csv import ParsedSite
 from netscope.loaders.sndlib_xml import ParsedBackbone
 from netscope.models import (
-    Coordinates,
     Demand,
     Endpoints,
     Link,
@@ -118,7 +117,11 @@ def build_network(
     # a fact about the rows themselves, so reporting it is more use than
     # reporting whatever the geometry pass happens to trip over first.
     links = _build_links(backbone, sites, sites_file)
-    positions = _place_sites(backbone.nodes, sites, sites_file)
+    positions = geometry.place_sites(
+        sites,
+        {node.id: node.coordinates for node in backbone.nodes},
+        sites_file=sites_file,
+    )
 
     nodes: dict[str, Node] = {node.id: node for node in backbone.nodes}
     for site in sites:
@@ -278,64 +281,4 @@ def _synthetic_demand(one_end: str, other_end: str, volume: float) -> Demand:
         id=f"{SYNTHETIC_DEMAND_PREFIX}-{endpoints.a}-{endpoints.b}",
         endpoints=endpoints,
         volume=volume,
-    )
-
-
-# --------------------------------------------------------------------------
-# Placement
-# --------------------------------------------------------------------------
-
-
-def _place_sites(
-    backbone_nodes: Sequence[Node],
-    sites: Sequence[ParsedSite],
-    sites_file: str,
-) -> Mapping[str, Coordinates]:
-    """Position every site, resolving attachments in dependency order.
-
-    A site can only be placed once every node it attaches to has a position,
-    and a site may attach to another site: ``OPS-EAST-1`` attaches to
-    ``HUB-EAST``, whose own position is derived from Warsaw. So this places
-    whatever it can, repeatedly. A pass that places nothing while sites
-    remain means those sites depend on one another in a circle, which has no
-    answer and is reported rather than approximated.
-    """
-    placed: dict[str, Coordinates] = {node.id: node.coordinates for node in backbone_nodes}
-    pending: list[ParsedSite] = list(sites)
-
-    while pending:
-        ready = [site for site in pending if all(t in placed for t in site.attaches_to)]
-        if not ready:
-            # The lowest row of the blocked group, so the message is the same
-            # on every run whatever order the rows arrived in.
-            blocked = min(pending, key=lambda site: site.row)
-            raise InputError(
-                sites_file,
-                f"site {blocked.site_id!r} cannot be placed because its attachments "
-                "lead in a circle back to itself, so no site in that circle has a "
-                "position to derive from",
-                row=blocked.row,
-                field="attaches_to",
-            )
-        for site in ready:
-            placed[site.site_id] = _attachment_centroid(
-                [placed[target] for target in site.attaches_to]
-            )
-        pending = [site for site in pending if site.site_id not in placed]
-
-    return placed
-
-
-def _attachment_centroid(attachments: Sequence[Coordinates]) -> Coordinates:
-    """The plain centroid of the points a site attaches to, with no offset.
-
-    P8 owns the refinement. It adds a small deterministic offset so that a
-    single-homed site does not render exactly on top of the city it attaches
-    to. Keeping the bare mean here means this merge carries no geometry
-    judgement of its own, and P8 can replace this one function.
-    """
-    count = len(attachments)
-    return Coordinates(
-        x=sum(point.x for point in attachments) / count,
-        y=sum(point.y for point in attachments) / count,
     )

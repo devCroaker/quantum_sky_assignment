@@ -14,6 +14,12 @@ operations sites and 1 aggregation hub, comes from ``data/sites.csv`` and is
 already pinned by the P6 suite. Everything else is arithmetic on those,
 shown in the comment that carries it.
 
+Placement is asserted here as "the centroid, displaced by exactly one
+``SITE_OFFSET_DEGREES``". The centroid arithmetic is still written out by
+hand next to each assertion, which is what these tests were always for. The
+offset itself, its direction and the non-overlap it buys belong to P8 and
+are tested in ``test_geometry.py``.
+
 The synthetic half uses hand-written ``ParsedBackbone`` and ``ParsedSite``
 values rather than fixture files. Both loaders reject most of what would be
 needed to provoke these rules from a file, so the only way to reach them is
@@ -23,12 +29,14 @@ minimal: two cities, and no more rows than the rule under test needs.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
 from netscope.errors import InputError
+from netscope.loaders.geometry import SITE_OFFSET_DEGREES
 from netscope.loaders.merge import (
     BACKBONE_CAPACITY,
     DATA_CENTER_PAIR_UNITS,
@@ -269,7 +277,7 @@ def test_twenty_nine_nodes_may_forward_traffic(network: Network) -> None:
     )
 
 
-def test_dc_north_sits_at_the_midpoint_of_hamburg_and_copenhagen(
+def test_dc_north_sits_one_offset_from_the_midpoint_of_hamburg_and_copenhagen(
     network: Network,
 ) -> None:
     """Worked by hand from the two coordinates in data/nobel-eu.xml.
@@ -278,33 +286,64 @@ def test_dc_north_sits_at_the_midpoint_of_hamburg_and_copenhagen(
     <y>55.41</y>. With two attachments the centroid is the midpoint:
     x = (10.0 + 12.32) / 2 = 22.32 / 2 = 11.16
     y = (53.33 + 55.41) / 2 = 108.74 / 2 = 54.37
-    Approximate comparison because both halves are binary floats, not
-    because the arithmetic is in doubt.
+
+    DC-NORTH does not sit on that point. P8 displaces every site by exactly
+    one SITE_OFFSET_DEGREES so that a marker never lands on top of the city
+    it attaches to, and for a two-attachment site that displacement is
+    perpendicular to the line through them. The midpoint is still what this
+    test proves, in two ways that only hold if the arithmetic above is the
+    arithmetic the code did: DC-NORTH is exactly one offset away from that
+    point, and it is equidistant from the two cities, which a point
+    displaced from anywhere other than their midpoint could not be.
+    Approximate comparisons because these are binary floats, not because
+    the arithmetic is in doubt.
     """
-    assert network.nodes["Hamburg"].coordinates == Coordinates(x=10.0, y=53.33)
-    assert network.nodes["Copenhagen"].coordinates == Coordinates(x=12.32, y=55.41)
+    hamburg = network.nodes["Hamburg"].coordinates
+    copenhagen = network.nodes["Copenhagen"].coordinates
+    assert hamburg == Coordinates(x=10.0, y=53.33)
+    assert copenhagen == Coordinates(x=12.32, y=55.41)
 
     placed = network.nodes["DC-NORTH"].coordinates
-    assert placed.x == pytest.approx(11.16)
-    assert placed.y == pytest.approx(54.37)
+    assert math.dist((placed.x, placed.y), (11.16, 54.37)) == pytest.approx(SITE_OFFSET_DEGREES)
+    assert math.dist((placed.x, placed.y), (hamburg.x, hamburg.y)) == pytest.approx(
+        math.dist((placed.x, placed.y), (copenhagen.x, copenhagen.y))
+    )
 
 
-def test_every_site_sits_at_the_centroid_of_its_attachments(network: Network) -> None:
+def test_every_site_sits_one_offset_from_the_centroid_of_its_attachments(
+    network: Network,
+) -> None:
     """The placement rule, checked against the rows for all nine sites.
 
+    The centroid is computed here from the attachment coordinates, and each
+    site is exactly one SITE_OFFSET_DEGREES from it. That is a stronger
+    statement about the centroid than a direct comparison would be now: a
+    centroid computed from the wrong points would land the site at some
+    other distance, since the offset is a fixed length and nothing scales
+    it.
+
     This covers the dependency order too: OPS-EAST-1's only attachment is
-    HUB-EAST, so its position can only match if HUB-EAST was placed first,
-    which is the iterative resolution working.
+    HUB-EAST, so its distance can only come out right if HUB-EAST was
+    placed first, which is the iterative resolution working.
     """
     for site in load_sites(SITES):
         points = [network.nodes[target].coordinates for target in site.attaches_to]
+        centroid = (
+            sum(p.x for p in points) / len(points),
+            sum(p.y for p in points) / len(points),
+        )
         placed = network.nodes[site.site_id].coordinates
-        assert placed.x == pytest.approx(sum(p.x for p in points) / len(points)), site.site_id
-        assert placed.y == pytest.approx(sum(p.y for p in points) / len(points)), site.site_id
+        assert math.dist((placed.x, placed.y), centroid) == pytest.approx(SITE_OFFSET_DEGREES), (
+            site.site_id
+        )
 
-    # OPS-EAST-1 inherits HUB-EAST's position exactly, because HUB-EAST is
-    # its one attachment. P8 adds the offset that pulls the two apart.
-    assert network.nodes["OPS-EAST-1"].coordinates == network.nodes["HUB-EAST"].coordinates
+    # OPS-EAST-1's centroid is HUB-EAST's position, because HUB-EAST is its
+    # one attachment, so before P8 the two were the same point. They are now
+    # one offset apart, and test_geometry.py owns that they are apart at all.
+    hub = network.nodes["HUB-EAST"].coordinates
+    ops = network.nodes["OPS-EAST-1"].coordinates
+    assert ops != hub
+    assert math.dist((ops.x, ops.y), (hub.x, hub.y)) == pytest.approx(SITE_OFFSET_DEGREES)
 
 
 def test_the_merge_is_deterministic() -> None:
@@ -519,9 +558,11 @@ def test_synthetic_demand_ids_do_not_depend_on_row_order() -> None:
 def test_a_site_attached_to_another_site_is_placed_after_it() -> None:
     """The dependency order, on rows small enough to check the arithmetic.
 
-    DC-ONE attaches to CityA at (0.0, 50.0) and CityB at (2.0, 52.0), so it
-    lands at (1.0, 51.0). OPS-P attaches only to DC-ONE, so it inherits that
-    exact position, which it can only do if DC-ONE was placed first.
+    DC-ONE attaches to CityA at (0.0, 50.0) and CityB at (2.0, 52.0), so its
+    centroid is the midpoint (1.0, 51.0) and it is placed one offset from
+    there. OPS-P attaches only to DC-ONE, so DC-ONE's placed position is
+    OPS-P's whole centroid: OPS-P ends up exactly one offset from wherever
+    DC-ONE landed, which it can only do if DC-ONE was placed first.
     """
     sites = (
         _site("DC-ONE", NodeKind.DATA_CENTER, ("CityA", "CityB"), row=2, capacity=200.0),
@@ -530,15 +571,18 @@ def test_a_site_attached_to_another_site_is_placed_after_it() -> None:
     )
     merged = build_network(_backbone(), sites, sites_file=FIXTURE_FILE)
 
-    assert merged.nodes["DC-ONE"].coordinates == Coordinates(x=1.0, y=51.0)
-    assert merged.nodes["OPS-P"].coordinates == Coordinates(x=1.0, y=51.0)
+    first = merged.nodes["DC-ONE"].coordinates
+    second = merged.nodes["OPS-P"].coordinates
+    assert math.dist((first.x, first.y), (1.0, 51.0)) == pytest.approx(SITE_OFFSET_DEGREES)
+    assert math.dist((second.x, second.y), (first.x, first.y)) == pytest.approx(SITE_OFFSET_DEGREES)
 
 
 def test_a_forward_reference_between_rows_places_just_as_well() -> None:
     """The dependent row first, since nothing in the format fixes row order.
 
     OPS-P is row 2 and the DC-ONE it attaches to is row 3. The first pass
-    places DC-ONE and DC-TWO, the second places OPS-P.
+    places DC-ONE and DC-TWO, the second places OPS-P one offset from
+    DC-ONE, whose own centroid is the hand-worked midpoint (1.0, 51.0).
     """
     sites = (
         _site("OPS-P", NodeKind.OPERATIONS_SITE, ("DC-ONE",), row=2),
@@ -546,7 +590,11 @@ def test_a_forward_reference_between_rows_places_just_as_well() -> None:
         _site("DC-TWO", NodeKind.DATA_CENTER, ("CityB",), row=4, capacity=200.0),
     )
     merged = build_network(_backbone(), sites, sites_file=FIXTURE_FILE)
-    assert merged.nodes["OPS-P"].coordinates == Coordinates(x=1.0, y=51.0)
+
+    first = merged.nodes["DC-ONE"].coordinates
+    second = merged.nodes["OPS-P"].coordinates
+    assert math.dist((first.x, first.y), (1.0, 51.0)) == pytest.approx(SITE_OFFSET_DEGREES)
+    assert math.dist((second.x, second.y), (first.x, first.y)) == pytest.approx(SITE_OFFSET_DEGREES)
 
 
 def test_demands_from_file_a_survive_the_merge_unchanged() -> None:
