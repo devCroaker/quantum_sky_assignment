@@ -54,12 +54,6 @@ SITE_KINDS: frozenset[NodeKind] = frozenset(
     {NodeKind.DATA_CENTER, NodeKind.OPERATIONS_SITE, NodeKind.AGGREGATION_HUB}
 )
 
-#: The file name used by :func:`resolve`, which is handed parsed rows rather
-#: than a path and so cannot recover the one they came from. This loader
-#: reads exactly one file, so naming it is honest, and it keeps the signature
-#: free of a path that the caller would have to carry around.
-RESOLVE_FILE_LABEL = "sites.csv"
-
 ATTACHMENT_SEPARATOR = ";"
 
 
@@ -118,19 +112,29 @@ def load_sites(path: Path) -> tuple[ParsedSite, ...]:
     return tuple(sites)
 
 
-def resolve(sites: tuple[ParsedSite, ...], known_node_ids: frozenset[str]) -> None:
+def resolve(
+    sites: tuple[ParsedSite, ...],
+    known_node_ids: frozenset[str],
+    file: str,
+) -> None:
     """Check that every attachment target exists.
 
     A target is either a backbone city id, supplied in ``known_node_ids``, or
-    another row's ``site_id``. Forward references are legal, so this runs
-    once over the whole table rather than row by row.
+    another row's ``site_id``. Nothing in the format fixes the order of the
+    two, so a target may be declared on a later row, and that is why this
+    runs once over the whole table rather than row by row.
+
+    ``file`` is passed in rather than inferred, so that a rejection names the
+    file the rows actually came from. The caller already holds the path, and
+    a hardcoded name here would make an error about a test fixture claim to
+    be about the real input.
     """
     site_ids = {site.site_id for site in sites}
     for site in sites:
         for target in site.attaches_to:
             if target not in known_node_ids and target not in site_ids:
                 raise InputError(
-                    RESOLVE_FILE_LABEL,
+                    file,
                     f"site {site.site_id!r} attaches to unknown target {target!r}, "
                     "which is neither a backbone node nor another site",
                     row=site.row,

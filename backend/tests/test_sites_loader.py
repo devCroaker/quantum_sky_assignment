@@ -101,7 +101,7 @@ def test_hub_east_is_the_only_transit_capable_site() -> None:
 
 
 def test_resolve_accepts_the_real_file_against_the_real_backbone() -> None:
-    resolve(load_sites(SITES), _backbone_node_ids())
+    resolve(load_sites(SITES), _backbone_node_ids(), str(SITES))
 
 
 def test_resolve_accepts_the_reference_from_ops_east_1_to_hub_east() -> None:
@@ -121,8 +121,8 @@ def test_resolve_accepts_the_reference_from_ops_east_1_to_hub_east() -> None:
     assert ops_east_1.attaches_to == ("HUB-EAST",)
     assert hub_east.attaches_to == ("Warsaw",)
     assert (hub_east.row, ops_east_1.row) == (7, 8)
-    resolve((hub_east, ops_east_1), frozenset({"Warsaw"}))
-    resolve((ops_east_1, hub_east), frozenset({"Warsaw"}))
+    resolve((hub_east, ops_east_1), frozenset({"Warsaw"}), str(SITES))
+    resolve((ops_east_1, hub_east), frozenset({"Warsaw"}), str(SITES))
 
 
 def test_resolve_rejects_an_unknown_target_naming_the_row() -> None:
@@ -136,11 +136,13 @@ def test_resolve_rejects_an_unknown_target_naming_the_row() -> None:
         ),
     )
     with pytest.raises(InputError) as caught:
-        resolve(sites, _backbone_node_ids())
+        resolve(sites, _backbone_node_ids(), "elsewhere/sites.csv")
     assert caught.value.row == 4
     assert caught.value.field == "attaches_to"
-    assert "sites.csv" in str(caught.value)
     assert "Atlantis" in str(caught.value)
+    # resolve names the file it was handed, not a hardcoded one, so an error
+    # about these rows cannot claim to be about the real input file.
+    assert caught.value.file == "elsewhere/sites.csv"
 
 
 # --------------------------------------------------------------------------
