@@ -42,8 +42,13 @@ is reproduced exactly as given in the assignment brief.
 Nine rows add nine nodes: two data centers, six operations sites and one aggregation hub.
 Each value in `attaches_to` creates one access link at the row's `access_capacity`. A value
 is either a city id from the backbone file or another row's `site_id`, which is why
-`OPS-EAST-1` can attach to `HUB-EAST`. Forward references between rows are therefore legal
-and resolution happens after all rows are read.
+`OPS-EAST-1` can attach to `HUB-EAST`.
+
+Nothing in the format fixes the order of those two rows, so a target may be declared on a
+later row than the row referring to it and no row can be resolved on its own. Resolution
+therefore happens after every row has been read. In the committed file the one
+site-to-site reference happens to point backwards, since `HUB-EAST` is row 7 and
+`OPS-EAST-1` is row 8, but the loader may not rely on that.
 
 - SHA-256: `f75a2d09eb7704ef1758d763c35f0721b4ab5b319cd9564d5956039ace856a5b`
 - 9 rows, 14 attachment values, so 14 access links.

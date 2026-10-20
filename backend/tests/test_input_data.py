@@ -100,10 +100,16 @@ def test_sites_file_adds_nine_nodes_and_fourteen_access_links() -> None:
 
 
 def test_site_attachments_resolve_to_a_city_or_another_site() -> None:
-    """Covers the forward reference from OPS-EAST-1 to HUB-EAST.
+    """Covers the site-to-site reference from OPS-EAST-1 to HUB-EAST.
 
-    Resolution cannot be done row by row in file order, which is why the
-    loader in P6 reads every row before resolving any attachment.
+    A target may be another row rather than a city, and nothing in the
+    format fixes the order of the two rows, so no row can be resolved on
+    its own. That is why the loader in P6 reads every row before resolving
+    any attachment.
+
+    In this file the reference points backwards, since HUB-EAST is row 7
+    and OPS-EAST-1 is row 8. The assertion below is deliberately
+    order-independent, so it would still hold if the rows were swapped.
     """
     cities = set(re.findall(r"<node id=\"([^\"]+)\">", _sndlib_text()))
     with SITES.open(newline="", encoding="utf-8") as handle:

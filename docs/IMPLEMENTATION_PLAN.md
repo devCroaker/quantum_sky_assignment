@@ -169,8 +169,9 @@ produce errors naming file and line.
 Parse the nine rows, split `attaches_to` on semicolons, and validate per R2: missing or
 unknown columns, bad site type, non-numeric or non-positive capacity, empty attachment
 list, self-attachment, duplicate attachment within a row, and duplicate `site_id`.
-Forward references between rows are legal, so resolution happens after all rows are read,
-but an unresolvable target is an error naming the file and the row.
+Nothing in the format fixes row order, so a target may be declared on a later row than the
+row referring to it and resolution happens after all rows are read. An unresolvable target
+is an error naming the file and the row.
 Accept: the real file yields 9 sites and 14 attachments. A table-driven test covers one
 malformed fixture per rule, each asserting the file name and the row number in the message.
 
