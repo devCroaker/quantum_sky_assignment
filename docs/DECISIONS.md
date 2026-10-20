@@ -199,6 +199,82 @@ and one with two, which is exactly the split R5 describes.
 switches to live data at P13. The plan's P16 acceptance check was amended to say so. The R1
 acceptance figures are asserted against the real loaders in P7, not here.
 
+## D18. What the backbone loader rejects beyond the brief's list
+**Decided by.** Tool, raised by the P5 subagent.
+Three calls worth recording, because each rejects input the brief did not mention.
+
+**NaN and infinity are rejected as non-numeric**, for coordinates and demand values alike.
+Python's `float()` accepts both. A NaN is neither greater than nor less than zero, so a NaN
+demand value would pass a positivity check and then silently poison every total, including
+the 2068 figure R1 pins. Rejected alternative: accept whatever `float()` accepts, which
+leaves a hole in exactly the numbers the acceptance check depends on.
+
+**Elements are matched on local name, so the namespace declaration is optional.** The real
+file declares `http://sndlib.zib.de/network`. Requiring it would report "has no `<nodes>`
+section" against a file whose nodes are plainly present, which is a worse failure than none.
+
+**Two demands over the same node pair are accepted.** Only ids must be unique. Nothing in
+the brief forbids it, and two demands between the same cities is legitimate data that simply
+sums. Confirmed the real file contains none, so this is about robustness and not about the
+committed input.
+
+## D19. Locating an error when there is no row to point at
+**Decided by.** Tool, raised by both loader subagents.
+R2 asks for the file and the row. Three cases have no obvious row or line.
+
+**A missing or unreadable file is reported at line 1**, and an **empty CSV at row 1**, where
+its header should have been. Rejected alternative: omit the location, which forces every
+caller to special-case the one error that has no position.
+
+**A duplicate id is reported at the second copy, not the first.** The first occurrence is
+valid content, and pointing a reader at correct data to explain a duplicate is unhelpful.
+
+**CSV fields are stripped of surrounding whitespace before the blank checks run**, so a field
+of only spaces is still rejected. Rejected alternative: byte-exact fields, which would reject
+a hand-edited file over invisible formatting.
+
+**A blank line mid-file is its own rule** rather than a field-count error, because the CSV
+reader yields a zero-field record and "expected 4 fields, found 0" misdescribes what the
+author did.
+
+## D20. Screen layout
+**Options.** Map with a persistent side panel, an equal split between map and tables, or a
+full-bleed map with findings in an overlay on click.
+**Chosen.** Map on the left at roughly two thirds, persistent side panel on the right
+carrying the critical list, the five most utilized links, and the failure impact.
+**Decided by.** Panel.
+**Why.** The numbers stay on screen while an element is being failed, which is what an
+operations lead needs and what makes the live demonstration answerable under questioning. A
+full-bleed map looks better and hides the figures until something is clicked.
+**Cost accepted.** The map is smaller than it could be, with 37 nodes and 55 links to place.
+
+## D21. How R10 avoids relying on colour
+**Options.** Shape, stroke pattern and numbered badges; text labels on the map; or tables as
+the authoritative view with the map carrying only keyed markers.
+**Chosen.** A second visual channel on every marked element. Critical nodes get a ring and a
+warning glyph, critical links are dashed, the five most utilized get a rank badge numbered
+one to five and a heavier stroke. Colour is decoration on top of all of that, never the
+carrier of meaning. The tables remain as the textual statement of the same facts.
+**Decided by.** Panel.
+**Why.** The encoding survives greyscale, a projector with poor colour, and the common forms
+of colour blindness. Text labels would be unambiguous but crowd badly at 55 links. P17 will
+test that every marked element carries a non-colour attribute, so this is enforced rather
+than merely intended.
+
+## D22. Where site placement lives, and the P7 to P8 split
+**Problem.** `Node` requires coordinates, so P7's merge cannot build a site node without
+placing it, yet P8 is the task that owns placement.
+**Chosen.** P7 places each site at the plain centroid of its attachment points, resolved
+iteratively in dependency order. P8 then adds the deterministic offset that stops a marker
+sitting on top of the city it attaches to, and owns the tests for non-overlap.
+**Decided by.** Tool.
+**Why.** The interesting part of placement is the dependency order, because `OPS-EAST-1`
+attaches to `HUB-EAST`, which is itself a site whose position is derived. That cannot be
+deferred, since the merge needs a coordinate for every node it builds. Splitting at the
+centroid keeps both tasks meaningful and keeps geometry out of the front end, per D9.
+**Consequence.** A circular attachment is detectable and is rejected in P7 with an
+`InputError` naming the file and a row, which is a case the brief does not mention.
+
 ---
 
 ## Open questions
@@ -207,6 +283,8 @@ Recorded here as they arise, with the resolution and its date.
 
 - ~~**R7a, does isolating a leaf site count as splitting the network?**~~ Resolved by the
   panel on 2026-10-20. Yes. See D12.
-- **R2 for the XML input.** The requirement says "names the file and the row", but XML has no
-  rows. Working answer: report the file and the line number, plus the element id when one
-  exists.
+- ~~**R2 for the XML input.**~~ Resolved in P5 on 2026-10-20. The requirement says "names the
+  file and the row", but XML has no rows, so the loader reports the file and the line. An
+  element with an id is located at its own line, one without at its position among its
+  siblings, and a missing section at the parent that should have held it. See D19 for the
+  cases with no line at all.

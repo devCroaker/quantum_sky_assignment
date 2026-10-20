@@ -184,9 +184,11 @@ test with those literals. Also assert that `HUB-EAST` receives no synthetic dema
 it is an aggregation hub and not an operations site.
 
 **P8. Site coordinates.** Depends: P7. Delegable.
-Place each site at the centroid of its attachment points, displaced by a small deterministic
-offset so it does not sit on top of a city, resolving in dependency order because
-`OPS-EAST-1` attaches to `HUB-EAST` rather than to a city.
+Add the deterministic offset that stops a site marker sitting on top of the city it attaches
+to. Amended during P7: the dependency-ordered centroid moved into P7, because `Node` requires
+coordinates and the merge cannot build a site node without placing it. `OPS-EAST-1` attaches
+to `HUB-EAST`, which is itself a site, so the ordering cannot be deferred. See D22. P8 keeps
+the offset and the non-overlap tests.
 Accept: every node has coordinates, placement is deterministic across runs, and each site
 is nearer to its own attachments than to any unrelated city.
 
