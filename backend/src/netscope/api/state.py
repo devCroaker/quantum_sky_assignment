@@ -20,8 +20,9 @@ from fastapi import Request
 
 from netscope.analysis import analyse
 from netscope.api import mappers
-from netscope.api.schemas import NetworkResponse, ScenarioReport
+from netscope.api.schemas import CriticalityResponse, NetworkResponse, ScenarioReport
 from netscope.config import Settings
+from netscope.criticality import sweep
 from netscope.loaders.merge import build_network
 from netscope.loaders.sites_csv import load_sites
 from netscope.loaders.sndlib_xml import load_backbone
@@ -34,11 +35,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class AppState:
-    """Everything the two endpoints serve from memory."""
+    """Everything the four endpoints serve from memory.
+
+    ``criticality_response`` is built here for the same reason
+    ``baseline_report`` is: P14's brief measures the sweep at about half a
+    second on the real network, fine once at startup and not fine per
+    request, so it joins the one existing cache rather than inventing a
+    second mechanism.
+    """
 
     network: Network
     network_response: NetworkResponse
     baseline_report: ScenarioReport
+    criticality_response: CriticalityResponse
 
 
 def build_state(
@@ -91,6 +100,7 @@ def build_state(
         network=built_network,
         network_response=mappers.network_response(built_network, resolved_attaches_to),
         baseline_report=mappers.scenario_report(baseline),
+        criticality_response=mappers.criticality_response(sweep(built_network)),
     )
 
 
