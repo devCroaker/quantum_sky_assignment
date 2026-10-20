@@ -23,6 +23,8 @@ from pydantic import BaseModel
 
 from netscope.api.schemas import (
     CriticalityReason,
+    CriticalityResponse,
+    ElementKind,
     ErrorResponse,
     NetworkResponse,
     ScenarioReport,
@@ -181,10 +183,20 @@ class TestContractDefaults:
         assert (parsed.error.file, parsed.error.row) == ("sites.csv", 4)
         assert parsed.error.line is None
 
-    def test_the_three_r7_reasons_are_the_only_ones(self) -> None:
+    def test_the_four_reason_codes_are_the_only_ones(self) -> None:
+        """R7 names three reasons. We report four, and the split is deliberate.
+
+        The panel confirmed the literal reading of R7b, under which a demand
+        lost because its own endpoint failed still counts. Keeping that as
+        its own code is what lets a reader filter for the genuine single
+        points of failure without recomputing anything, which matters
+        because the literal reading marks 36 of the real network's 37 nodes
+        critical.
+        """
         assert [reason.value for reason in CriticalityReason] == [
             "partitions-network",
             "demands-undeliverable",
+            "endpoint-demands-lost",
             "links-overloaded",
         ]
 
@@ -198,3 +210,115 @@ def test_committed_schema_is_up_to_date() -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+class TestCriticalityFixture:
+    """The fifteen assessments over the seven-node fixture network.
+
+    These numbers come from a separate brute-force implementation written
+    before netscope had any routing code, described in the docstring of
+    scripts/make_fixtures.py. Its credential is that it reproduces the
+    hand-derived baseline loads above exactly. P12 has to reproduce these in
+    turn, which is the point of asserting them here.
+    """
+
+    def test_every_element_is_assessed(self) -> None:
+        """R7 is answered for all 15 elements, not only the critical ones.
+
+        That is what lets one payload answer both the "where are the single
+        points of failure" question and the "which links does traffic depend
+        on most" question, by filtering versus sorting.
+        """
+        report = load("criticality.json", CriticalityResponse)
+        assert len(report.assessments) == 15
+        assert report.summary.nodes_evaluated == 7
+        assert report.summary.links_evaluated == 8
+        kinds = [a.kind for a in report.assessments]
+        assert kinds.count(ElementKind.NODE) == 7
+        assert kinds.count(ElementKind.LINK) == 8
+
+    def test_six_of_seven_nodes_are_critical_and_only_copenhagen_is_not(self) -> None:
+        """The fixture-scale version of what R7b's literal reading costs.
+
+        Copenhagen survives because both demands still have a minimum-hop
+        path without it, and it is an endpoint of neither.
+        """
+        report = load("criticality.json", CriticalityResponse)
+        assert report.summary.critical_nodes == 6
+        safe = [a.id for a in report.assessments if a.kind is ElementKind.NODE and not a.critical]
+        assert safe == ["Copenhagen"]
+
+    def test_three_of_eight_links_are_critical(self) -> None:
+        """The two single-homed access links, plus the only path east.
+
+        Both DC-NORTH access links are safe because it is dual-homed, and the
+        three links of the western triangle each have an alternative.
+        """
+        report = load("criticality.json", CriticalityResponse)
+        assert report.summary.critical_links == 3
+        critical = sorted(
+            a.id for a in report.assessments if a.kind is ElementKind.LINK and a.critical
+        )
+        assert critical == ["ACC-HUB-EAST-Warsaw", "ACC-OPS-EAST-1-HUB-EAST", "L4"]
+
+    def test_the_critical_flag_follows_the_reasons_list(self) -> None:
+        report = load("criticality.json", CriticalityResponse)
+        for assessment in report.assessments:
+            assert assessment.critical == bool(assessment.reasons)
+
+    def test_warsaw_is_the_only_element_firing_three_reasons(self) -> None:
+        """It partitions the network, strands D1, and is an endpoint of D2.
+
+        Worth pinning because it is the one case where all three mechanisms
+        coincide, so a bug that conflates any two of them shows up here.
+        """
+        report = load("criticality.json", CriticalityResponse)
+        by_id = {(a.kind, a.id): a for a in report.assessments}
+        warsaw = by_id[(ElementKind.NODE, "Warsaw")]
+        assert set(warsaw.reasons) == {
+            CriticalityReason.PARTITIONS_NETWORK,
+            CriticalityReason.DEMANDS_UNDELIVERABLE,
+            CriticalityReason.ENDPOINT_DEMANDS_LOST,
+        }
+        assert warsaw.impact.components == 2
+        assert (warsaw.impact.undeliverable_demands, warsaw.impact.undeliverable_units) == (1, 10.0)
+        assert (
+            warsaw.impact.endpoint_affected_demands,
+            warsaw.impact.endpoint_affected_units,
+        ) == (1, 100.0)
+
+    def test_the_endpoint_only_cases_are_distinguishable(self) -> None:
+        """Hamburg, DC-NORTH and OPS-EAST-1 are critical for one reason only.
+
+        None of them partitions anything or strands a demand between two
+        survivors. Under the stricter reading of R7b they would not be
+        critical at all, and this test is what proves the payload still
+        carries enough to tell the difference.
+        """
+        report = load("criticality.json", CriticalityResponse)
+        endpoint_only = sorted(
+            a.id
+            for a in report.assessments
+            if a.reasons == (CriticalityReason.ENDPOINT_DEMANDS_LOST,)
+        )
+        assert endpoint_only == ["DC-NORTH", "Hamburg", "OPS-EAST-1"]
+
+    def test_no_fixture_scenario_overloads_a_link(self) -> None:
+        """Stated so its absence is not mistaken for a result.
+
+        The backbone links are 550 and the largest demand is 100, so R7c
+        cannot fire on this network. It is exercised against the real
+        network in P12, where the baseline peak is 71 percent.
+        """
+        report = load("criticality.json", CriticalityResponse)
+        assert all(a.impact.overloaded_links == 0 for a in report.assessments)
+        assert all(a.impact.max_utilization < 1.0 for a in report.assessments)
+        assert not any(CriticalityReason.LINKS_OVERLOADED in a.reasons for a in report.assessments)
+
+    def test_no_link_failure_has_an_endpoint_affected_demand(self) -> None:
+        """Losing a link never removes a node, so the bucket must be empty."""
+        report = load("criticality.json", CriticalityResponse)
+        for assessment in report.assessments:
+            if assessment.kind is ElementKind.LINK:
+                assert assessment.impact.endpoint_affected_demands == 0
+                assert assessment.impact.endpoint_affected_units == 0.0
