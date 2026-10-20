@@ -27,6 +27,41 @@ import { createProjection, MAP_HEIGHT, MAP_WIDTH } from './projection';
  * which is visible on first load before anyone has panned anywhere.
  */
 const LABEL_FLIP_MARGIN = 150;
+
+/**
+ * The four reason codes in the order the contract declares them, so a cluster's
+ * union of reasons is stable rather than depending on which member was read
+ * first.
+ */
+const REASON_ORDER: readonly CriticalityReason[] = [
+  'partitions-network',
+  'demands-undeliverable',
+  'endpoint-demands-lost',
+  'links-overloaded',
+];
+
+/** Clears the cluster marker's own ring, which is drawn at radius 11. */
+const CLUSTER_CRITICAL_RING_RADIUS = 15;
+
+/**
+ * The same warning glyph a critical node carries, offset clear of the larger
+ * cluster ring. Shape and position carry the meaning, not colour (D21).
+ */
+function ClusterWarningMarker(): JSX.Element {
+  const offset = CLUSTER_CRITICAL_RING_RADIUS - 2;
+  return (
+    <g
+      className="critical-marker"
+      transform={`translate(${String(offset)},${String(-offset)})`}
+    >
+      <polygon className="critical-marker-triangle" points="0,-5 4.3,3 -4.3,3" />
+      <text className="critical-marker-bang" y={2.4}>
+        !
+      </text>
+    </g>
+  );
+}
+
 import { useZoomPan } from './useZoomPan';
 
 /**
@@ -353,6 +388,17 @@ export function MapView({
                 // inside the same zoom-transformed `<g>` as everything else, so it pans
                 // and scales with the map instead of needing its own transform math.
                 const baseCentroid = baseCentroidOf(cluster, basePositions);
+                // The union of every member's reasons, in the order the enum
+                // declares them, so the attribute is stable and comparable.
+                const memberReasons = cluster.members.map(
+                  (member) => criticalNodes.get(member.id) ?? [],
+                );
+                const clusterReasons = REASON_ORDER.filter((reason) =>
+                  memberReasons.some((reasons) => reasons.includes(reason)),
+                );
+                const criticalMemberCount = memberReasons.filter(
+                  (reasons) => reasons.length > 0,
+                ).length;
                 return (
                   <g
                     key={key}
@@ -360,6 +406,12 @@ export function MapView({
                       markerRefs.current.set(key, el);
                     }}
                     className="cluster-marker"
+                    data-critical-reasons={
+                      clusterReasons.length > 0 ? clusterReasons.join(' ') : undefined
+                    }
+                    data-critical-members={
+                      clusterReasons.length > 0 ? String(criticalMemberCount) : undefined
+                    }
                     transform={`translate(${String(baseCentroid.x)},${String(baseCentroid.y)})`}
                     tabIndex={0}
                     role="button"
@@ -381,7 +433,28 @@ export function MapView({
                       if (event.key === 'Escape') setOpenClusterKey(null);
                     }}
                   >
-                    <title>{cluster.members.length} nodes here, open for details</title>
+                    <title>
+                      {cluster.members.length} nodes here
+                      {clusterReasons.length > 0 ? ', some critical' : ''}, open for
+                      details
+                    </title>
+                    {/*
+                      A cluster absorbs its members' glyphs, so without this the
+                      criticality of everything inside it would simply vanish from
+                      the map. On the real network that is not hypothetical: the
+                      three eastern nodes cluster at the default view and one of
+                      them, HUB-EAST, is one of only four nodes that partition the
+                      network. The marker therefore carries the union of its
+                      members' reasons, shown the same way a single node shows
+                      them, so D21 holds for a cluster too.
+                    */}
+                    {clusterReasons.length > 0 ? (
+                      <circle
+                        className="critical-ring"
+                        r={CLUSTER_CRITICAL_RING_RADIUS}
+                      />
+                    ) : null}
+                    {clusterReasons.length > 0 ? <ClusterWarningMarker /> : null}
                     <circle className="cluster-marker-ring" r={11} />
                     {/*
                       The count is text, which is what makes this marker legible without
