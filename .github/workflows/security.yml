@@ -1,0 +1,170 @@
+name: Security
+
+# Separate from ci.yml on purpose. These checks answer a different question ("are the
+# dependencies we already have known to be vulnerable today?") and they need a schedule,
+# which ci.yml does not want. Keeping them apart also means three parallel branches are not
+# all editing one workflow file.
+#
+# Policy and gaps are written up in docs/security.md. Read that before trusting a green run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays at 04:17 UTC. A dependency becomes vulnerable while the code sits still, so a
+    # pull-request-only trigger never catches the advisory published the week after a merge.
+    # The odd minute keeps the run off the top of the hour, where GitHub queues are longest.
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+# Third-party actions below are pinned to a major version tag (@v4, @v5), matching ci.yml.
+# Pinning to a commit SHA is the stricter option: a tag is mutable, so whoever controls the
+# action repository can move it to new code that runs with this workflow's token. It was not
+# done here because this is a short-lived assignment repository with a read-only token and no
+# secrets beyond an optional Snyk token, and SHA pins need a renovation tool to stay current
+# or they rot. See docs/security.md, "Action pinning".
+
+jobs:
+  python-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e "backend[dev]"
+      - name: Audit installed Python dependencies
+        # Audits the resolved environment, not the version ranges in pyproject.toml, so it
+        # sees the transitive tree that actually gets installed. No --ignore-vuln entries:
+        # a finding fails the job and a human decides what to do about it.
+        #
+        # --skip-editable drops netscope itself, which is installed from the working tree and
+        # has no PyPI release to look up. --strict is not used because it turns that one
+        # expected skip into an error.
+        run: .venv/bin/pip-audit --skip-editable --progress-spinner=off
+
+  node-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip until the front end exists
+        id: probe
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "frontend/package.json absent, lands in P15. Nothing to audit yet."
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.probe.outputs.present == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Audit the npm dependency tree
+        if: steps.probe.outputs.present == 'true'
+        working-directory: frontend
+        # --audit-level=high means the job fails on high and critical only. The front end
+        # tree is mostly build and test tooling, where low and moderate advisories are
+        # routinely unreachable from shipped code (a regex denial of service in a dev-only
+        # transitive package, say). Failing on those trains people to ignore the job, which
+        # costs more than it catches. Everything found is still printed below, so a moderate
+        # advisory is visible in the log even though it does not fail the run.
+        run: |
+          npm audit --audit-level=high
+      - name: Full advisory list, informational
+        if: always() && steps.probe.outputs.present == 'true'
+        working-directory: frontend
+        # Prints every severity for the reader. Deliberately non-failing: the gate above is
+        # the gate.
+        run: npm audit || true
+
+  snyk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for a Snyk token
+        id: probe
+        # The token is optional by design. This repository holds no credential, forks do not
+        # inherit secrets, and a clone without the secret must still get a green workflow. A
+        # job that fails on every fork is worse than no job, so the token is probed once here
+        # and every later step is gated on the result.
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "$SNYK_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "SNYK_TOKEN is present, running the Snyk scan."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "SNYK_TOKEN is not set, so the Snyk scan is skipped. This is not a failure."
+            echo "To enable it: create a free Snyk account, copy the API token from"
+            echo "https://app.snyk.io/account, then add it to this repository under"
+            echo "Settings > Secrets and variables > Actions > New repository secret,"
+            echo "with the name exactly SNYK_TOKEN (repository secret, not an environment"
+            echo "secret, and not a variable). Nothing else needs to change."
+            echo "pip-audit and npm audit already ran and need no credential."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.probe.outputs.present == 'true'
+      - uses: astral-sh/setup-uv@v5
+        if: steps.probe.outputs.present == 'true'
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        if: steps.probe.outputs.present == 'true'
+        with:
+          node-version: "22"
+      - name: Install the Snyk CLI
+        if: steps.probe.outputs.present == 'true'
+        # The CLI rather than snyk/actions/*, because those actions are published only from a
+        # branch and have no version tag to pin to, which would be a looser pin than the rest
+        # of this file. snyk@1 pins the CLI major version.
+        run: npm install --global snyk@1
+      - name: Scan the back end
+        if: steps.probe.outputs.present == 'true'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        # Snyk reads a requirements file for Python, and this project declares ranges in
+        # pyproject.toml with no lockfile, so the resolved environment is frozen to a
+        # throwaway requirements file outside the tree and scanned. That keeps the scan on
+        # the versions that would actually be installed, and commits nothing.
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e "backend[dev]"
+          uv pip freeze --python .venv/bin/python \
+            | grep -v "^-e " \
+            | grep -v "^netscope" > "$RUNNER_TEMP/requirements.txt"
+          snyk test \
+            --file="$RUNNER_TEMP/requirements.txt" \
+            --package-manager=pip \
+            --severity-threshold=high
+      - name: Probe for the front end
+        if: steps.probe.outputs.present == 'true'
+        id: frontend
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "frontend/package.json absent, lands in P15. Nothing to scan yet."
+          fi
+      - name: Scan the front end
+        if: steps.probe.outputs.present == 'true' && steps.frontend.outputs.present == 'true'
+        working-directory: frontend
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        # Same high threshold as npm audit, for the same reason.
+        run: |
+          npm ci
+          snyk test --severity-threshold=high
