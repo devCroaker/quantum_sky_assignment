@@ -24,3 +24,6 @@ frontend/dist/
 .env
 .env.*
 !.env.example
+
+# Subagent worktrees, created under .claude/ while tasks run in parallel.
+.claude/worktrees/
