@@ -35,7 +35,7 @@ jobs:
   python-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -56,7 +56,7 @@ jobs:
   node-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Skip until the front end exists
         id: probe
         run: |
@@ -115,7 +115,7 @@ jobs:
             echo "secret, and not a variable). Nothing else needs to change."
             echo "pip-audit and npm audit already ran and need no credential."
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.probe.outputs.present == 'true'
       - uses: astral-sh/setup-uv@v5
         if: steps.probe.outputs.present == 'true'
