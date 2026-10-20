@@ -143,10 +143,23 @@ scoring and fix advice. **What it does not add:** it is still dependency scannin
 look at our code, and on the free tier the test count is limited.
 
 The back end scan exports `backend/uv.lock` to a throwaway requirements file under
-`$RUNNER_TEMP` and scans that, because Snyk reads a requirements file for Python. `uv export`
-emits hashes and `--no-emit-project` drops `netscope` itself, which has no PyPI release.
-Nothing is committed, and the exported versions are the pinned ones rather than a fresh
-resolution. The front end is scanned too, behind the same file probe.
+`$RUNNER_TEMP` and scans that, because Snyk reads a requirements file for Python.
+`--no-emit-project` drops `netscope` itself, which has no PyPI release. Nothing is committed,
+and the exported versions are the pinned ones rather than a fresh resolution. The front end
+is scanned too, behind the same file probe.
+
+Snyk's pip scanner needed three accommodations, each of which cost a failed run to find.
+Hashes are suppressed, because `uv export` writes them and Snyk's parser does not want them.
+The environment is installed and `--command` points at its interpreter, because Snyk resolves
+the dependency tree through a real interpreter rather than from the file alone, and without
+one it fails with `SNYK-OS-PYTHON-0013`, "Missing required packages", even when every version
+is pinned. And `--skip-unresolved` is set, which is Snyk's own documented remedy for that
+error, so a package it cannot resolve is skipped rather than failing the run.
+
+That last flag is a caveat worth stating plainly: a silently skipped package is not scanned by
+Snyk. It is not a hole, because `pip-audit` covers the same tree with no such limitation and
+fails on any finding. Snyk's value here is a second curated advisory database on top, not the
+only line of defence.
 
 The Snyk CLI is installed with `npm install --global snyk@1` rather than through
 `snyk/actions/*`, because those actions are published only from a branch and offer no version

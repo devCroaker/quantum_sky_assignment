@@ -155,21 +155,42 @@ jobs:
         run: npm install --global snyk@1
       - name: Scan the back end
         if: steps.probe.outputs.present == 'true'
+        # Snyk reads a requirements file for Python, so the lockfile is exported to one
+        # outside the tree. --no-emit-project drops netscope itself, which has no PyPI
+        # release. Nothing is committed, and the exported versions are exactly what
+        # uv.lock pins rather than a fresh resolution.
+        #
+        # Three details are needed to make Snyk's pip scanner work here, each of which
+        # cost a failed run to find:
+        #
+        #   --no-hashes       uv export writes hashes by default. Snyk's pip parser does
+        #                     not want them and they carry no information it uses, since
+        #                     it matches on name and version.
+        #   --command         Snyk resolves the dependency tree through a real Python
+        #                     interpreter rather than from the file alone. Without being
+        #                     told which one, it fails with "Missing required packages"
+        #                     (SNYK-OS-PYTHON-0013) even though every version is pinned.
+        #                     That is why the environment is installed first.
+        #   --skip-unresolved Snyk's own documented remedy for the same error. Kept as a
+        #                     belt-and-braces measure: a package it cannot resolve is
+        #                     skipped rather than failing the run. pip-audit covers the
+        #                     same tree with no such caveat, so a skip here is not a hole.
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        # Snyk reads a requirements file for Python, so the lockfile is exported to one
-        # outside the tree. uv export emits hashes, and --no-emit-project drops netscope
-        # itself, which has no PyPI release. Nothing is committed, and the exported versions
-        # are exactly what uv.lock pins rather than a fresh resolution.
+          UV_PROJECT_ENVIRONMENT: ${{ github.workspace }}/.venv
         run: |
+          uv sync --project backend --extra dev --locked
           uv export --project backend \
             --format requirements-txt \
             --extra dev \
             --no-emit-project \
+            --no-hashes \
             --locked > "$RUNNER_TEMP/requirements.txt"
           snyk test \
             --file="$RUNNER_TEMP/requirements.txt" \
             --package-manager=pip \
+            --command="${{ github.workspace }}/.venv/bin/python" \
+            --skip-unresolved \
             --severity-threshold=high
       - name: Probe for the front end
         if: steps.probe.outputs.present == 'true'
