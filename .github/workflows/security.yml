@@ -41,7 +41,11 @@ jobs:
           enable-cache: true
       - name: Install from the lockfile
         env:
-          UV_PROJECT_ENVIRONMENT: .venv
+          # Absolute, because uv resolves a relative UV_PROJECT_ENVIRONMENT
+          # against the --project directory and would put the virtualenv in
+          # backend/ while every later step looks for it at the repository
+          # root. The Makefile passes $(CURDIR) for the same reason.
+          UV_PROJECT_ENVIRONMENT: ${{ github.workspace }}/.venv
         run: uv sync --project backend --extra dev --locked
       - name: Audit the locked Python dependencies
         # Audits the installed environment, which --locked guarantees is exactly what
