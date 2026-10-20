@@ -1,0 +1,161 @@
+{
+  "links": [
+    {
+      "capacity": 200.0,
+      "endpoints": [
+        "Copenhagen",
+        "DC-NORTH"
+      ],
+      "id": "ACC-DC-NORTH-Copenhagen",
+      "kind": "access"
+    },
+    {
+      "capacity": 200.0,
+      "endpoints": [
+        "DC-NORTH",
+        "Hamburg"
+      ],
+      "id": "ACC-DC-NORTH-Hamburg",
+      "kind": "access"
+    },
+    {
+      "capacity": 80.0,
+      "endpoints": [
+        "HUB-EAST",
+        "Warsaw"
+      ],
+      "id": "ACC-HUB-EAST-Warsaw",
+      "kind": "access"
+    },
+    {
+      "capacity": 40.0,
+      "endpoints": [
+        "HUB-EAST",
+        "OPS-EAST-1"
+      ],
+      "id": "ACC-OPS-EAST-1-HUB-EAST",
+      "kind": "access"
+    },
+    {
+      "capacity": 550.0,
+      "endpoints": [
+        "Copenhagen",
+        "Hamburg"
+      ],
+      "id": "L1",
+      "kind": "backbone"
+    },
+    {
+      "capacity": 550.0,
+      "endpoints": [
+        "Berlin",
+        "Hamburg"
+      ],
+      "id": "L2",
+      "kind": "backbone"
+    },
+    {
+      "capacity": 550.0,
+      "endpoints": [
+        "Berlin",
+        "Copenhagen"
+      ],
+      "id": "L3",
+      "kind": "backbone"
+    },
+    {
+      "capacity": 550.0,
+      "endpoints": [
+        "Berlin",
+        "Warsaw"
+      ],
+      "id": "L4",
+      "kind": "backbone"
+    }
+  ],
+  "nodes": [
+    {
+      "attaches_to": [],
+      "can_transit": true,
+      "id": "Berlin",
+      "kind": "backbone-city",
+      "position": {
+        "x": 13.21,
+        "y": 52.31
+      }
+    },
+    {
+      "attaches_to": [],
+      "can_transit": true,
+      "id": "Copenhagen",
+      "kind": "backbone-city",
+      "position": {
+        "x": 12.32,
+        "y": 55.41
+      }
+    },
+    {
+      "attaches_to": [
+        "Hamburg",
+        "Copenhagen"
+      ],
+      "can_transit": false,
+      "id": "DC-NORTH",
+      "kind": "data-center",
+      "position": {
+        "x": 10.41,
+        "y": 53.87
+      }
+    },
+    {
+      "attaches_to": [
+        "Warsaw"
+      ],
+      "can_transit": true,
+      "id": "HUB-EAST",
+      "kind": "aggregation-hub",
+      "position": {
+        "x": 21.39,
+        "y": 51.74
+      }
+    },
+    {
+      "attaches_to": [],
+      "can_transit": true,
+      "id": "Hamburg",
+      "kind": "backbone-city",
+      "position": {
+        "x": 10.0,
+        "y": 53.33
+      }
+    },
+    {
+      "attaches_to": [
+        "HUB-EAST"
+      ],
+      "can_transit": false,
+      "id": "OPS-EAST-1",
+      "kind": "operations-site",
+      "position": {
+        "x": 22.19,
+        "y": 51.34
+      }
+    },
+    {
+      "attaches_to": [],
+      "can_transit": true,
+      "id": "Warsaw",
+      "kind": "backbone-city",
+      "position": {
+        "x": 20.59,
+        "y": 52.14
+      }
+    }
+  ],
+  "totals": {
+    "demand_units": 110.0,
+    "demands": 2,
+    "links": 8,
+    "nodes": 7
+  }
+}

@@ -50,6 +50,14 @@ files = ["src", "tests"]
 module = "networkx.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# Pydantic's own BaseModel machinery is typed with Any, so every model class
+# definition trips disallow_any_explicit. The Any is Pydantic's, not ours. The
+# rule stays on everywhere else, which is where it actually catches an escape
+# hatch we wrote. Full strict mode still applies to this module. See D16.
+module = "netscope.api.schemas"
+disable_error_code = ["explicit-any"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers --strict-config"

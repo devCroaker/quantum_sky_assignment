@@ -1,0 +1,105 @@
+{
+  "components": 1,
+  "endpoint_affected_demands": [],
+  "failed": {
+    "links": [],
+    "nodes": []
+  },
+  "link_loads": [
+    {
+      "capacity": 200.0,
+      "link_id": "ACC-DC-NORTH-Copenhagen",
+      "load": 5.0,
+      "utilization": 0.025
+    },
+    {
+      "capacity": 200.0,
+      "link_id": "ACC-DC-NORTH-Hamburg",
+      "load": 5.0,
+      "utilization": 0.025
+    },
+    {
+      "capacity": 80.0,
+      "link_id": "ACC-HUB-EAST-Warsaw",
+      "load": 10.0,
+      "utilization": 0.125
+    },
+    {
+      "capacity": 40.0,
+      "link_id": "ACC-OPS-EAST-1-HUB-EAST",
+      "load": 10.0,
+      "utilization": 0.25
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L1",
+      "load": 0.0,
+      "utilization": 0.0
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L2",
+      "load": 105.0,
+      "utilization": 0.19090909090909092
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L3",
+      "load": 5.0,
+      "utilization": 0.00909090909090909
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L4",
+      "load": 110.0,
+      "utilization": 0.2
+    }
+  ],
+  "most_utilized": [
+    {
+      "capacity": 40.0,
+      "link_id": "ACC-OPS-EAST-1-HUB-EAST",
+      "load": 10.0,
+      "rank": 1,
+      "utilization": 0.25
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L4",
+      "load": 110.0,
+      "rank": 2,
+      "utilization": 0.2
+    },
+    {
+      "capacity": 550.0,
+      "link_id": "L2",
+      "load": 105.0,
+      "rank": 3,
+      "utilization": 0.19090909090909092
+    },
+    {
+      "capacity": 80.0,
+      "link_id": "ACC-HUB-EAST-Warsaw",
+      "load": 10.0,
+      "rank": 4,
+      "utilization": 0.125
+    },
+    {
+      "capacity": 200.0,
+      "link_id": "ACC-DC-NORTH-Copenhagen",
+      "load": 5.0,
+      "rank": 5,
+      "utilization": 0.025
+    }
+  ],
+  "overloaded_links": [],
+  "partitioned": false,
+  "totals": {
+    "demands": 2,
+    "units": 110.0,
+    "units_delivered": 110.0,
+    "units_endpoint_affected": 0.0,
+    "units_undeliverable": 0.0
+  },
+  "undeliverable_demands": []
+}
