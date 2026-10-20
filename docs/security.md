@@ -17,12 +17,28 @@ branches work without colliding in one file.
 
 ## Triggers
 
-Pull requests, pushes to `main`, and a weekly cron at 04:17 UTC on Mondays.
+Pull requests, pushes to `main`, and manual dispatch. The scheduled trigger is **written and
+commented out**.
 
-The schedule is the part that earns its keep. A pull-request trigger tells you about the code
-you just wrote. It never tells you that a dependency you merged six weeks ago had an advisory
-published yesterday, because nothing in the repository changed. On a project where the code
-sits still between milestones, the scheduled run is the only trigger that catches that case.
+Every check, Snyk included, runs on every pull request. That is the trigger that matters
+day to day, because it blocks a dependency change at the point of review.
+
+The schedule is the one trigger that catches something the others cannot. A pull-request run
+tells you about the code you just wrote. It never tells you that a dependency merged six weeks
+ago had an advisory published yesterday, because nothing in the repository changed. On a
+long-lived service that case is the main reason to have these checks at all, and the schedule
+should be on.
+
+It is off here on purpose. This repository is short-lived, and a weekly cron on a quiet
+repository produces runs nobody reads, which is precisely how a failing security job comes to
+be ignored. The cron line is left in place, commented, with the reasoning next to it, so
+enabling it is uncommenting two lines rather than rediscovering the decision.
+
+Until then the same sweep is available on demand, from the Actions tab or with:
+
+```bash
+gh workflow run Security
+```
 
 `permissions: contents: read` and a `concurrency` group match `ci.yml`. The workflow needs no
 write token: nothing it does writes to the repository.
@@ -103,29 +119,23 @@ threshold for the production dependency tree should drop to `moderate`, with the
 threshold kept only for `devDependencies` (`npm audit --omit=dev --audit-level=moderate` as a
 second gate).
 
-### 3. `snyk`, optional and credential-free by default
+### 3. `snyk`, enabled, and still safe without a token
 
-Snyk needs an account token and this repository has none. The job therefore probes
-`${{ secrets.SNYK_TOKEN }}` in its first step, writes an output, and gates every later step on
-it. With no token the job prints an explanation and succeeds. It never fails, and it never
-blocks the workflow.
+`SNYK_TOKEN` is configured as a repository secret, so this job **runs for real on every pull
+request and push to `main`**, scanning both halves and failing on high severity and above.
 
-That is not politeness. Secrets are not available to workflows triggered from a fork, and a
-clone of this repository by a reviewer has no secrets at all, so a Snyk job that failed
-without a token would be red on every fork and on every fresh clone. A permanently red job is
-worse than no job.
+The job still probes for the token in its first step and gates every later step on the result,
+because a secret is not always present even when it is configured. GitHub does not pass
+secrets to workflows triggered from a fork, and a reviewer's fresh clone has none at all. A
+Snyk job that failed in those cases would be red on every fork and every clone, and a
+permanently red job is worse than no job. With no token it prints an explanation naming the
+secret to add, succeeds, and does not block the workflow.
 
-**To enable it:**
+The probe reads the secret into an environment variable rather than testing the expression in
+an `if:`, because a secret is not available to a job-level condition.
 
-1. Create a free Snyk account and copy the API token from <https://app.snyk.io/account>.
-2. In this repository, go to **Settings > Secrets and variables > Actions > New repository
-   secret**.
-3. Name it exactly `SNYK_TOKEN`. It must be a repository secret, not an environment secret
-   and not a variable, because the workflow reads `secrets.SNYK_TOKEN` with no `environment:`
-   set.
-
-Nothing else changes. The next run picks it up. `pip-audit` and `npm audit` keep working
-either way, so Snyk is additive and the workflow is never dependent on it.
+`pip-audit` and `npm audit` need no credential and run regardless, so Snyk is additive and the
+workflow never depends on it.
 
 **What it adds over the free checks.** A second advisory database with its own curation and
 its own timing, which sometimes carries a finding days before the public feeds, plus severity

@@ -11,11 +11,24 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    # Mondays at 04:17 UTC. A dependency becomes vulnerable while the code sits still, so a
-    # pull-request-only trigger never catches the advisory published the week after a merge.
-    # The odd minute keeps the run off the top of the hour, where GitHub queues are longest.
-    - cron: "17 4 * * 1"
+  # Run on demand from the Actions tab, or with: gh workflow run Security
+  workflow_dispatch:
+
+  # The scheduled trigger is written and deliberately left commented out.
+  #
+  # It is the one trigger that catches an advisory published the week after a
+  # merge, because a dependency becomes vulnerable while the code sits still
+  # and nothing about the repository changes. On a long-lived service it should
+  # be on. It is off here because this repository is short-lived and a weekly
+  # cron on a quiet repository produces runs nobody reads, which is how a
+  # failing security job comes to be ignored.
+  #
+  # To enable it, uncomment the two lines below. Mondays at 04:17 UTC, with the
+  # odd minute keeping the run off the top of the hour where GitHub's queues
+  # are longest.
+  #
+  # schedule:
+  #   - cron: "17 4 * * 1"
 
 permissions:
   contents: read
@@ -100,10 +113,14 @@ jobs:
     steps:
       - name: Check for a Snyk token
         id: probe
-        # The token is optional by design. This repository holds no credential, forks do not
-        # inherit secrets, and a clone without the secret must still get a green workflow. A
-        # job that fails on every fork is worse than no job, so the token is probed once here
-        # and every later step is gated on the result.
+        # SNYK_TOKEN is now configured as a repository secret, so this job runs for real on
+        # every pull request and push to main. The probe stays because a secret is not always
+        # there: GitHub does not pass secrets to workflows triggered from a fork, and a fresh
+        # clone of this repository has none. A job that fails in those cases is worse than no
+        # job, so the token is probed once here and every later step is gated on the result.
+        #
+        # The probe reads the secret into an env var rather than testing the expression
+        # directly, because a secret is unavailable to an `if:` condition at the job level.
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
