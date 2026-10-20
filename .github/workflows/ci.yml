@@ -26,7 +26,11 @@ jobs:
         # also what makes the audit jobs in security.yml meaningful: they
         # report on the versions that actually get installed.
         env:
-          UV_PROJECT_ENVIRONMENT: .venv
+          # Absolute, because uv resolves a relative UV_PROJECT_ENVIRONMENT
+          # against the --project directory and would put the virtualenv in
+          # backend/ while every later step looks for it at the repository
+          # root. The Makefile passes $(CURDIR) for the same reason.
+          UV_PROJECT_ENVIRONMENT: ${{ github.workspace }}/.venv
         run: uv sync --project backend --extra dev --locked
       - name: Lint
         run: |
