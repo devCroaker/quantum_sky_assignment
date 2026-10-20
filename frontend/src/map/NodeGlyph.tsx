@@ -1,10 +1,36 @@
 import type { JSX } from 'react';
 
-import type { NodeKind } from '../api/types';
+import type { CriticalityReason, NodeKind } from '../api/types';
+import { useHighlightHandlers } from '../state/selectionContext';
 import { glyphShapeFor, kindLabelFor } from './nodeKind';
 
 /** Radius/half-width used so the four shapes read as roughly the same visual size. */
 const GLYPH_SIZE = 7;
+
+/** Radius of the dashed ring drawn around a critical node (D21). Large enough to clear
+ * every glyph shape, including the diamond, which is the widest at this size. */
+const CRITICAL_RING_RADIUS = GLYPH_SIZE + 6;
+
+/**
+ * A small warning triangle, offset to the glyph's upper right, so a critical node reads as
+ * "shape plus marker" rather than only "shape in a ring". D21 asks for both the ring and a
+ * warning marker on critical nodes; the ring alone would be easy to miss against the
+ * cluster-marker ring style, which also uses a dashed circle.
+ */
+function WarningMarker(): JSX.Element {
+  const offset = GLYPH_SIZE + 4;
+  return (
+    <g
+      className="critical-marker"
+      transform={`translate(${String(offset)},${String(-offset)})`}
+    >
+      <polygon className="critical-marker-triangle" points="0,-5 4.3,3 -4.3,3" />
+      <text className="critical-marker-bang" y={2.4}>
+        !
+      </text>
+    </g>
+  );
+}
 
 /** Builds an SVG `points` attribute value from numeric coordinate pairs. */
 function points(coords: ReadonlyArray<readonly [number, number]>): string {
@@ -53,6 +79,8 @@ export function NodeGlyph({
   y,
   label,
   labelSide = 'right',
+  critical = false,
+  reasons = [],
 }: {
   id: string;
   kind: NodeKind;
@@ -67,21 +95,46 @@ export function NodeGlyph({
    * caller knows the width it is drawing into.
    */
   labelSide?: 'left' | 'right';
+  /** R7/R10: true when this node is a single point of failure under any reason. */
+  critical?: boolean;
+  /**
+   * Which R7 reasons apply. Carried as the `data-critical-reasons` DOM attribute so a test
+   * (and a future export) can read why a node is marked without inferring it from a ring
+   * that greyscale, a bad projector or colour blindness could just as easily hide (D21).
+   */
+  reasons?: readonly CriticalityReason[];
 }): JSX.Element {
+  const { highlighted, onPointerEnter, onPointerLeave, onFocus, onBlur, onSelect } =
+    useHighlightHandlers({ kind: 'node', id });
+  const classes = ['node-glyph'];
+  if (critical) classes.push('node-glyph-critical');
+  if (highlighted) classes.push('is-highlighted');
   return (
     <g
-      className="node-glyph"
+      className={classes.join(' ')}
       data-node-id={id}
       data-shape={glyphShapeFor(kind)}
+      data-critical-reasons={critical ? reasons.join(' ') : undefined}
       transform={`translate(${String(x)},${String(y)})`}
       tabIndex={0}
       role="button"
-      aria-label={`${id}, ${kindLabelFor(kind)}`}
+      aria-label={
+        critical
+          ? `${id}, ${kindLabelFor(kind)}, critical: ${reasons.join(', ')}`
+          : `${id}, ${kindLabelFor(kind)}`
+      }
+      onMouseEnter={onPointerEnter}
+      onMouseLeave={onPointerLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onClick={onSelect}
     >
       <title>
         {id} ({kindLabelFor(kind)})
       </title>
+      {critical ? <circle className="critical-ring" r={CRITICAL_RING_RADIUS} /> : null}
       <ShapePath kind={kind} />
+      {critical ? <WarningMarker /> : null}
       {label ? (
         <text
           className="node-label"

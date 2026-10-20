@@ -2,10 +2,19 @@ import type { JSX } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { geoPath } from 'd3-geo';
 
-import type { NetworkResponse, NodeWire } from '../api/types';
+import type {
+  CriticalityReason,
+  CriticalityResponse,
+  LinkKind,
+  NetworkResponse,
+  NodeWire,
+  RankedLink,
+} from '../api/types';
+import { useHighlightHandlers } from '../state/selectionContext';
 import { ClusterPopover } from './ClusterPopover';
 import type { Cluster, ScreenPoint } from './clustering';
 import { CLUSTER_THRESHOLD_PX, clusterByProximity } from './clustering';
+import { Legend } from './Legend';
 import { landFeatures } from './landOutline';
 import { NodeGlyph } from './NodeGlyph';
 import { createProjection, MAP_HEIGHT, MAP_WIDTH } from './projection';
@@ -49,6 +58,75 @@ interface Projected extends ScreenPoint {
 }
 
 /**
+ * One link line, plus its D21 overlays: a dashed stroke and a reasons attribute when it is
+ * critical, a rank badge and a heavier stroke when it is one of the five most utilized.
+ *
+ * A link needs its own component, rather than being built inline in the `network.links.map`
+ * call the way it was before P17, because highlighting it is a hook
+ * (`useHighlightHandlers`), and a hook cannot be called from inside an array callback.
+ */
+function LinkLine({
+  id,
+  kind,
+  from,
+  to,
+  critical,
+  reasons,
+  rank,
+}: {
+  id: string;
+  kind: LinkKind;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  critical: boolean;
+  reasons: readonly CriticalityReason[];
+  rank: number | undefined;
+}): JSX.Element {
+  const { highlighted, onPointerEnter, onPointerLeave, onSelect } = useHighlightHandlers({
+    kind: 'link',
+    id,
+  });
+  const classes = [`link`, `link-${kind}`];
+  if (critical) classes.push('link-critical');
+  if (rank !== undefined) classes.push('link-top-utilized');
+  if (highlighted) classes.push('is-highlighted');
+  const midpoint = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  return (
+    <>
+      <line
+        className={classes.join(' ')}
+        data-link-id={id}
+        data-critical-reasons={critical ? reasons.join(' ') : undefined}
+        data-rank={rank}
+        x1={from.x}
+        y1={from.y}
+        x2={to.x}
+        y2={to.y}
+        onMouseEnter={onPointerEnter}
+        onMouseLeave={onPointerLeave}
+        onClick={onSelect}
+      >
+        <title>
+          {id}
+          {critical ? ` (critical: ${reasons.join(', ')})` : ''}
+          {rank !== undefined ? ` (rank ${String(rank)} of 5 most utilized)` : ''}
+        </title>
+      </line>
+      {rank !== undefined ? (
+        <g
+          className="rank-badge"
+          transform={`translate(${String(midpoint.x)},${String(midpoint.y)})`}
+          aria-hidden="true"
+        >
+          <circle r={7} />
+          <text y={3}>{rank}</text>
+        </g>
+      ) : null}
+    </>
+  );
+}
+
+/**
  * The map: a projection of the node positions over a faint land outline, pannable and
  * zoomable, with a popover for nodes that land close enough together on screen to not be
  * separately clickable otherwise.
@@ -57,7 +135,20 @@ interface Projected extends ScreenPoint {
  * is given with `d3-geo` and draws them. See `./projection.ts` for which projection and
  * why, and `./clustering.ts` for the popover's grouping rule.
  */
-export function MapView({ network }: { network: NetworkResponse }): JSX.Element {
+export function MapView({
+  network,
+  criticality,
+  mostUtilized,
+}: {
+  network: NetworkResponse;
+  /** R10: drives the critical-node ring/marker and critical-link dash. Undefined while
+   * GET /api/v1/criticality has not resolved yet, which the map tolerates by drawing
+   * nothing extra rather than waiting. */
+  criticality?: CriticalityResponse;
+  /** R10: ScenarioReport.most_utilized, already ranked by the server (D4). Undefined
+   * before the baseline has loaded. */
+  mostUtilized?: readonly RankedLink[];
+}): JSX.Element {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
@@ -132,6 +223,38 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
     return positions;
   }, [network.nodes, projection]);
 
+  // Which nodes and links are critical, and why, keyed by id for an O(1) lookup while
+  // drawing. Built once per criticality response rather than searched per element.
+  const criticalNodes = useMemo(() => {
+    const map = new Map<string, readonly CriticalityReason[]>();
+    for (const assessment of criticality?.assessments ?? []) {
+      if (assessment.kind === 'node' && assessment.critical) {
+        map.set(assessment.id, assessment.reasons ?? []);
+      }
+    }
+    return map;
+  }, [criticality]);
+
+  const criticalLinks = useMemo(() => {
+    const map = new Map<string, readonly CriticalityReason[]>();
+    for (const assessment of criticality?.assessments ?? []) {
+      if (assessment.kind === 'link' && assessment.critical) {
+        map.set(assessment.id, assessment.reasons ?? []);
+      }
+    }
+    return map;
+  }, [criticality]);
+
+  // Rank (1 to 5) of a link id if it is among the five most utilized, server-ordered (D4):
+  // the map never re-sorts or recomputes this, only looks it up.
+  const rankByLinkId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const ranked of mostUtilized ?? []) {
+      map.set(ranked.link_id, ranked.rank);
+    }
+    return map;
+  }, [mostUtilized]);
+
   // Screen-space positions at the current zoom, which is what the clustering threshold is
   // defined against: two nodes far apart when zoomed out can separate once zoomed in, and
   // the grouping has to track that (the reviewer's "zoomed in, they separate" requirement).
@@ -187,13 +310,15 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
                 const to = basePositions.get(b);
                 if (from === undefined || to === undefined) return null;
                 return (
-                  <line
+                  <LinkLine
                     key={link.id}
-                    className={`link link-${link.kind}`}
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
+                    id={link.id}
+                    kind={link.kind}
+                    from={from}
+                    to={to}
+                    critical={criticalLinks.has(link.id)}
+                    reasons={criticalLinks.get(link.id) ?? []}
+                    rank={rankByLinkId.get(link.id)}
                   />
                 );
               })}
@@ -218,6 +343,8 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
                       labelSide={
                         base.x > MAP_WIDTH - LABEL_FLIP_MARGIN ? 'left' : 'right'
                       }
+                      critical={criticalNodes.has(only.id)}
+                      reasons={criticalNodes.get(only.id) ?? []}
                     />
                   );
                 }
@@ -294,6 +421,7 @@ export function MapView({ network }: { network: NetworkResponse }): JSX.Element 
           />
         ) : null}
       </div>
+      <Legend />
     </section>
   );
 }
