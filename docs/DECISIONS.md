@@ -110,15 +110,52 @@ requests with explicit acceptance checks.
 planning, so the plan is built on measured facts. Writing the sequence down first is what
 makes the work delegable and the git history legible.
 
+## D11. Git workflow
+**Options.** One pull request per task merged with a merge commit, the same with a rebase
+merge, or well-written commits straight onto `main`.
+**Chosen.** One branch and one pull request per task, merged with a merge commit.
+**Decided by.** Panel.
+**Why.** The brief says the history will be read and must not be squashed. A merge commit
+keeps every individual commit and also preserves the boundary of each task, so a reviewer
+can see both the fine grain and the unit of work. The pull request description is also the
+natural place to name the requirement ids a task satisfies.
+**Cost accepted.** Twenty-two pull requests to review.
+
+## D12. R7a, does isolating a leaf site count as splitting the network?
+**Options.** Judge connectivity on the whole remaining graph, so stranding a single-homed
+site is a partition, or count only partitions of the backbone and report stranded sites
+under R7b instead.
+**Chosen.** Any partition of the remaining graph counts.
+**Decided by.** Panel, after the tool raised it.
+**Why.** It is the plain reading of R7a, and it is the finding the operations lead most
+needs. Since the backbone is 2-connected, no backbone city or link partitions anything, so
+under the narrower reading the partition rule would never fire and the four genuine single
+points of failure would be reported under a softer label.
+**Consequence.** Critical for the partition reason: `Dublin`, `Athens`, `Warsaw` and
+`HUB-EAST`, plus the four access links serving the single-homed sites. No backbone city or
+backbone link is critical for that reason. This resolves the first open question below.
+
+## D13. Parallel execution with subagents
+**Options.** Run the four lanes concurrently in separate git worktrees, pair up two tasks at
+a time, or work strictly sequentially.
+**Chosen.** Lane-parallel once the API contract lands, with every agent's output reviewed
+before it reaches `main`.
+**Decided by.** Panel.
+**Why.** The plan's dependency graph has four genuinely independent lanes after P4, and the
+front end lane can run against the committed fixture for its whole length. Each agent works
+in its own worktree, so concurrent work cannot interleave in the history.
+**Guard.** The foundation and the interface, P1 through P4, are not delegated. Those tasks
+fix the house rules, the domain model and the wire contract that every later agent depends
+on, so getting them wrong would propagate. They are done directly and reviewed first.
+
 ---
 
 ## Open questions
 
 Recorded here as they arise, with the resolution and its date.
 
-- **R7a, does isolating a leaf site count as splitting the network?** Working answer: yes.
-  Connectivity is judged on the graph remaining after the element is removed, and a node
-  with no path to the rest is a partition. Flagged to the panel.
+- ~~**R7a, does isolating a leaf site count as splitting the network?**~~ Resolved by the
+  panel on 2026-10-20. Yes. See D12.
 - **R2 for the XML input.** The requirement says "names the file and the row", but XML has no
   rows. Working answer: report the file and the line number, plus the element id when one
   exists.

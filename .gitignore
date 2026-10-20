@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/dist/
+.vite/
+
+# Editors and OS
+.DS_Store
+.idea/
+*.swp
+
+# Local environment. Never commit secrets.
+.env
+.env.*
+!.env.example

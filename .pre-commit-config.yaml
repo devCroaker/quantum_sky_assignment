@@ -1,0 +1,35 @@
+# Runs the same gates as CI, so a failure is caught before it reaches a branch.
+# Install once with: .venv/bin/pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict)
+        entry: bash -c 'cd backend && ../.venv/bin/mypy'
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$
+      - id: no-em-dash
+        name: no em-dashes in prose or code
+        entry: bash -c 'if grep -rln "\xe2\x80\x94" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.md" .; then echo "em-dash found, see CLAUDE.md"; exit 1; fi'
+        language: system
+        pass_filenames: false
