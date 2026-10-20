@@ -148,6 +148,29 @@ in its own worktree, so concurrent work cannot interleave in the history.
 fix the house rules, the domain model and the wire contract that every later agent depends
 on, so getting them wrong would propagate. They are done directly and reviewed first.
 
+## D14. Fail fast on bad input, or collect every problem
+**Options.** Raise on the first problem found, or validate the whole file and report every
+violation at once.
+**Chosen.** Raise on the first problem.
+**Decided by.** Tool.
+**Why.** R2 asks for "an error", singular, that names the file and the row. A malformed
+input is a reason to stop rather than something to work around, and one precise message is
+easier to act on than a list whose later entries are often consequences of the first. The
+error object keeps `file`, `row`, `line` and `field` as separate attributes, so the API layer
+can build a structured response and a future change to collecting all errors would not need
+the message format to change.
+
+## D15. Invariants live in the model, not in the loaders
+**Chosen.** `Endpoints` sorts its own pair, `NodeKind` answers whether it may forward
+traffic, and `Network` rejects a link or demand naming a node it does not have.
+**Decided by.** Tool.
+**Why.** Undirectedness (R3) and the transit rule (R6) are stated once each and cannot be
+forgotten at a call site. Routing never has to defend against a dangling reference, which
+keeps the router short enough to explain on a slide. The cost is that the model raises
+`ValueError` rather than `InputError`, because a violation there is a programming mistake
+and not a bad input file. Loaders are responsible for turning file content into valid
+constructor arguments, and for reporting failures with file and row.
+
 ---
 
 ## Open questions
