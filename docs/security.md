@@ -161,6 +161,21 @@ Snyk. It is not a hole, because `pip-audit` covers the same tree with no such li
 fails on any finding. Snyk's value here is a second curated advisory database on top, not the
 only line of defence.
 
+**Read the dependency counts in the log before trusting a green Snyk tick.** A real run
+reports:
+
+```
+Scan the back end    Tested 61 dependencies for known issues, found 0 issues
+Scan the front end   Tested  3 dependencies for known issues, found 0 issues
+```
+
+Sixty-one is the whole locked back end tree. **Three is not the front end tree.** Snyk's npm
+scan covers production dependencies only, which here is `react`, `react-dom` and one
+transitive package. The hundreds of build and test packages are not in that number. They are
+covered by `npm audit`, which reads the full tree including `devDependencies`, and that is why
+both checks exist rather than one. A green Snyk result on the front end says nothing about the
+toolchain.
+
 The Snyk CLI is installed with `npm install --global snyk@1` rather than through
 `snyk/actions/*`, because those actions are published only from a branch and offer no version
 tag to pin to, which would be a looser pin than everything else in the file.
