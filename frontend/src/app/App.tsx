@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useEffect, useState } from 'react';
 
 import type { NetworkDataSource } from '../api';
-import { MapPlaceholder } from '../map/MapPlaceholder';
+import { MapView } from '../map/MapView';
 import { SidePanel } from '../panels/SidePanel';
 import type { NetworkResponse } from '../api/types';
 
@@ -77,7 +77,7 @@ export function App({ source }: { source: NetworkDataSource }): JSX.Element {
             <h2 id="map-heading">Map</h2>
           </section>
         ) : (
-          <MapPlaceholder network={network} />
+          <MapView network={network} />
         )}
         <SidePanel />
       </main>

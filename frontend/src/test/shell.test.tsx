@@ -31,15 +31,18 @@ describe('the shell', () => {
     );
   });
 
-  it('makes every placeholder element that P18 will click keyboard reachable', async () => {
+  it('makes every node on the map keyboard reachable, for P18 to build selection on', async () => {
     render(<App source={createFixtureDataSource()} />);
 
-    const chips = await screen.findAllByRole('button');
-    expect(chips).toHaveLength(7);
-    // Real buttons, none of them disabled, so the tab order already reaches all seven.
-    for (const chip of chips) {
-      expect(chip.tagName).toBe('BUTTON');
-      expect(chip.hasAttribute('disabled')).toBe(false);
+    // P16 replaced the node-chip placeholder with the real map: seven SVG node glyphs
+    // (role="button", focusable), one per fixture node, instead of seven <button>s. The
+    // map itself has no clusters in the plain fixture, so these are the only "button" role
+    // elements the map contributes.
+    const glyphs = await screen.findAllByRole('button');
+    expect(glyphs).toHaveLength(7);
+    for (const glyph of glyphs) {
+      expect(glyph.getAttribute('tabindex')).toBe('0');
+      expect(glyph.hasAttribute('aria-disabled')).toBe(false);
     }
   });
 });
