@@ -56,7 +56,7 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
             echo "frontend/package.json absent, lands in P15"
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.probe.outputs.present == 'true'
         with:
           node-version: "22"
