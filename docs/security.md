@@ -83,10 +83,13 @@ Current state at the time of writing, from the real run: no known vulnerabilitie
 
 ### 2. `node-audit`, npm audit
 
-`frontend/package.json` does not exist on `main` yet; the front end lands in P15. The job
-copies the probe pattern from `ci.yml`: a first step checks for the file and sets an output,
-and every later step is gated on it, so the job passes with an explanatory line in the log
-until the front end arrives. No edit is needed when it does.
+The job copies the probe pattern from `ci.yml`: a first step checks whether `frontend/package.json`
+exists and sets an output, and every later step is gated on it. That guard was written while the
+front end did not exist yet, so the job could pass cleanly before P15 landed. The front end has
+since landed, `frontend/package.json` is on `main`, and the job runs for real, scanning the full
+dependency tree on every pull request. The guard is left in place rather than removed, since a
+front-end-free clone of this repository, or a fork that strips it, should still get a clean run
+rather than a failure on a missing file.
 
 Once the front end exists, the job runs `npm audit --audit-level=high` in `frontend/`, then a
 second non-failing `npm audit` that prints every severity for the reader.

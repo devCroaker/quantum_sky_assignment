@@ -71,6 +71,30 @@ sides cannot drift apart by hand.
 Design decisions, including the ones that were close calls, are recorded with their rejected
 alternatives in [docs/DECISIONS.md](docs/DECISIONS.md).
 
+### Two decisions worth knowing before reading a number
+
+**Criticality (R7) does not count a demand lost to its own failed endpoint.** The requirement
+says an element is critical if losing it leaves any demand undeliverable, and read literally
+that includes the element's own traffic. Under that reading 37 of the real network's 37 nodes
+are critical, because 36 of them originate a demand and the thirty-seventh partitions the
+graph: the count cannot be lower whatever the network looks like, so it measures who sends
+traffic rather than the network's structure. The panel chose instead to count only the three
+reasons that describe harm to a node that survives: partitioning the graph, stranding a demand
+between two survivors, or overloading a surviving link. Under that reading, 6 of 37 nodes and
+6 of 55 links are critical. The endpoint-affected traffic is still reported, as R8 requires, in
+every scenario's own bucket; it is simply not counted toward `critical`. Full reasoning in
+[docs/DECISIONS.md](docs/DECISIONS.md), entry D24.
+
+**The 550-unit backbone capacity R3 fixes is overridable at runtime, and the default enforces
+it.** `NETSCOPE_BACKBONE_CAPACITY` defaults to 550, so an unmodified clone satisfies R3 exactly.
+Setting it to anything else produces a network R3 no longer describes, which is a deliberate
+trade rather than an oversight: the brief's own follow-up session includes a live change, and a
+capacity adjustment is the most natural thing to ask for in that slot. If this setting is ever
+overridden to demonstrate something, say so explicitly, since nothing else in the output will.
+Full reasoning, including why the override was kept rather than removed, in
+[docs/DECISIONS.md](docs/DECISIONS.md), entry D27.
+
+
 ## How the numbers are checked
 
 The routing engine rests on four independent legs rather than on its own tests agreeing with

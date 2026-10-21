@@ -204,12 +204,46 @@ def _question_one(network: Network, criticality: CriticalitySweep) -> str:
         ]
     )
 
-    lines.append(_warsaw_paragraph(nodes))
+    lines.append(_warsaw_paragraph(nodes, network))
     return "\n".join(lines)
 
 
-def _warsaw_paragraph(nodes: Sequence[Assessment]) -> str:
+def _warsaw_paragraph(nodes: Sequence[Assessment], network: Network) -> str:
+    """Named the sites that lose traffic, not just the count.
+
+    A prior version said "the hub's own demands have no legal path," which is
+    wrong. HUB-EAST is an aggregation hub, and R4 gives synthetic demands only
+    to operations sites and data centers, so HUB-EAST originates none of its
+    own. The two demands that die are OPS-EAST-1's: it attaches only to
+    HUB-EAST, HUB-EAST attaches only to Warsaw, and OPS-EAST-2's attachment to
+    Budapest cannot rescue them because OPS-EAST-2 is an operations site and
+    may not forward traffic under R6. An independent review caught this
+    misattribution; this function now reads the actual endpoints from the
+    scenario rather than asserting a plausible-sounding story.
+    """
     warsaw = _by_id(nodes, "Warsaw")
+    scenario = analyse(network, failed_nodes=frozenset({"Warsaw"}))
+    # The site whose demands these are is whichever endpoint every stranded
+    # demand shares, not the union of all endpoints touched: DC-NORTH and
+    # DC-SOUTH each appear in one demand, as the *other* end, not the site
+    # that lost its path. Taking the union named both data centers as well as
+    # OPS-EAST-1, which was a second, subtler version of the same mistake
+    # this function exists to fix.
+    endpoint_sets = [
+        {demand.endpoints.a, demand.endpoints.b} for demand in scenario.undeliverable
+    ]
+    common = set.intersection(*endpoint_sets) - {"Warsaw"} if endpoint_sets else set()
+    if len(common) == 1:
+        whose = f"`{next(iter(common))}`'s"
+    else:
+        # No single site is common to every stranded demand. Name each
+        # demand's pair explicitly rather than guess at a single subject.
+        pairs = ", ".join(
+            f"`{d.endpoints.a}`–`{d.endpoints.b}`" for d in scenario.undeliverable
+        )
+        whose = (
+            f"the {pairs} demand pair{'s' if len(scenario.undeliverable) != 1 else ''}'"
+        )
     return (
         "### Warsaw: the case a connectivity check gets wrong\n\n"
         f"`Warsaw` partitions nothing: losing it leaves the graph in "
@@ -217,7 +251,7 @@ def _warsaw_paragraph(nodes: Sequence[Assessment]) -> str:
         "`OPS-EAST-2` "
         "attaches to both `HUB-EAST` and `Budapest` and so accidentally dual-homes the "
         "aggregation hub, and `OPS-EAST-2` is an operations site that may not forward "
-        "traffic under R6. With `Warsaw` gone, the hub's own "
+        f"traffic under R6. With `Warsaw` gone, {whose} "
         f"{warsaw.impact.undeliverable_demands} demands ({_num(warsaw.impact.undeliverable_units)} "
         "units) have no legal path even though the graph is still in one piece. A "
         "connectivity check alone would call this network more resilient than it is.\n"

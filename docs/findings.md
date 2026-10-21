@@ -35,7 +35,7 @@ The remaining critical elements are the ones that overload a surviving link rath
 
 ### Warsaw: the case a connectivity check gets wrong
 
-`Warsaw` partitions nothing: losing it leaves the graph in 1 piece. It is still critical, because `OPS-EAST-2` attaches to both `HUB-EAST` and `Budapest` and so accidentally dual-homes the aggregation hub, and `OPS-EAST-2` is an operations site that may not forward traffic under R6. With `Warsaw` gone, the hub's own 2 demands (20.0 units) have no legal path even though the graph is still in one piece. A connectivity check alone would call this network more resilient than it is.
+`Warsaw` partitions nothing: losing it leaves the graph in 1 piece. It is still critical, because `OPS-EAST-2` attaches to both `HUB-EAST` and `Budapest` and so accidentally dual-homes the aggregation hub, and `OPS-EAST-2` is an operations site that may not forward traffic under R6. With `Warsaw` gone, `OPS-EAST-1`'s 2 demands (20.0 units) have no legal path even though the graph is still in one piece. A connectivity check alone would call this network more resilient than it is.
 
 ## 2. Which links does the traffic depend on most?
 
