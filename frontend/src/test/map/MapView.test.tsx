@@ -5,8 +5,21 @@ import { describe, expect, it } from 'vitest';
 import { parseNetworkResponse } from '../../api/guards';
 import type { NetworkResponse, NodeWire } from '../../api/types';
 import { MapView } from '../../map/MapView';
+import { SelectionProvider } from '../../state/selection';
 
 const fixture = parseNetworkResponse(networkFixture);
+
+/**
+ * Every glyph and link line reads the shared highlight state (P17), so MapView can only be
+ * rendered inside the same SelectionProvider that App supplies in the real shell.
+ */
+function renderMap(network: NetworkResponse): ReturnType<typeof render> {
+  return render(
+    <SelectionProvider>
+      <MapView network={network} />
+    </SelectionProvider>,
+  );
+}
 
 describe('MapView', () => {
   // The committed fixture (contracts/fixtures/network.json) is a seven-node cut-down of
@@ -14,13 +27,13 @@ describe('MapView', () => {
   // fixture's own counts means this test stays correct once the view switches to the
   // full network at P13, instead of silently checking the wrong number forever.
   it('renders every node and every link in the fixture', () => {
-    const { container } = render(<MapView network={fixture} />);
+    const { container } = renderMap(fixture);
     expect(container.querySelectorAll('.node-glyph')).toHaveLength(fixture.nodes.length);
     expect(container.querySelectorAll('.link')).toHaveLength(fixture.links.length);
   });
 
   it('gives every node kind in the fixture its own, non-colour shape (D21)', () => {
-    const { container } = render(<MapView network={fixture} />);
+    const { container } = renderMap(fixture);
     const shapeByKind = new Map<string, string>();
     for (const node of fixture.nodes) {
       const glyph = container.querySelector(`[data-node-id="${node.id}"]`);
@@ -65,7 +78,7 @@ function networkWithCluster(): NetworkResponse {
 }
 
 function openPopover(): { marker: Element; menu: HTMLElement } {
-  const { container } = render(<MapView network={networkWithCluster()} />);
+  const { container } = renderMap(networkWithCluster());
   const marker = container.querySelector('.cluster-marker');
   expect(marker).not.toBeNull();
   if (marker === null) throw new Error('unreachable, asserted above');
@@ -76,7 +89,7 @@ function openPopover(): { marker: Element; menu: HTMLElement } {
 
 describe('MapView cluster popover', () => {
   it('shows a visible count on the cluster marker before it is ever opened', () => {
-    const { container } = render(<MapView network={networkWithCluster()} />);
+    const { container } = renderMap(networkWithCluster());
     const marker = container.querySelector('.cluster-marker');
     // Text, not colour: a reader sees "2" without hovering anything (D21 applied to the
     // marker itself, not only to the glyphs).

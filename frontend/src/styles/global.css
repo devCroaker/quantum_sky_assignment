@@ -170,6 +170,94 @@ h2 {
   stroke-width: 3;
 }
 
+/*
+ * D21 overlays: a critical node gets a dashed ring plus a warning marker, a critical link
+ * gets a dashed stroke, and a top-five link gets a rank badge plus a heavier stroke. Colour
+ * (the --critical/--rank variables below) sits on top of all of that but is never the only
+ * carrier: the ring, the dash pattern, the stroke weight and the numeral in the badge all
+ * survive greyscale on their own.
+ */
+.critical-ring {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 1.5;
+}
+
+.critical-marker-triangle {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.2;
+}
+
+.critical-marker-bang {
+  fill: var(--ink);
+  font-size: 7px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.link-critical {
+  stroke-dasharray: 5 3;
+  stroke-width: 1.5;
+}
+
+.link-top-utilized {
+  stroke-width: 2.5;
+}
+
+.rank-badge circle {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.3;
+}
+
+.rank-badge text {
+  fill: var(--ink);
+  font-size: 8px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.node-glyph.is-highlighted,
+.link.is-highlighted {
+  stroke: var(--focus);
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.map-legend-glyph {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+.map-legend-node {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.map-legend-link {
+  stroke: var(--ink-muted);
+  stroke-width: 1;
+}
+
 .cluster-marker {
   cursor: pointer;
 }
@@ -302,4 +390,102 @@ h2 {
 .node-chip-kind {
   color: var(--ink-muted);
   font-size: 0.72rem;
+}
+
+.critical-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.critical-filter legend {
+  padding: 0 0.3rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.critical-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.critical-filter-count {
+  margin: 0 0 0.4rem;
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+
+.critical-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.critical-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--paper-sunk);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.critical-row.is-highlighted {
+  border-color: var(--focus);
+}
+
+.critical-row-id {
+  font-weight: 600;
+}
+
+.critical-row-kind,
+.critical-row-reasons {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+}
+
+.top-utilized-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.top-utilized-table th,
+.top-utilized-table td {
+  padding: 0.25rem 0.35rem;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+}
+
+.top-utilized-table tbody tr {
+  cursor: pointer;
+}
+
+.top-utilized-table tbody tr.is-highlighted {
+  background: var(--paper-sunk);
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.top-utilized-rank {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }

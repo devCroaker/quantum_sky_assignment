@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { createFixtureDataSource } from '../api/fixtureDataSource';
@@ -37,8 +37,10 @@ describe('the shell', () => {
     // P16 replaced the node-chip placeholder with the real map: seven SVG node glyphs
     // (role="button", focusable), one per fixture node, instead of seven <button>s. The
     // map itself has no clusters in the plain fixture, so these are the only "button" role
-    // elements the map contributes.
-    const glyphs = await screen.findAllByRole('button');
+    // elements the map contributes. Scoped to the map's own <svg>, since P17 adds buttons
+    // of its own to the Critical panel (one per critical row) that this test is not about.
+    const mapSvg = await screen.findByRole('application');
+    const glyphs = within(mapSvg).getAllByRole('button');
     expect(glyphs).toHaveLength(7);
     for (const glyph of glyphs) {
       expect(glyph.getAttribute('tabindex')).toBe('0');
