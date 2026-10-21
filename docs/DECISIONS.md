@@ -427,6 +427,33 @@ written brief can be checked against what came back, and a conversation cannot.
 interface every later task depends on, and anything hard to reverse. The foundation, the
 domain model and the wire contract were written directly for that reason.
 
+## D26. The verification oracle is committed, not a scratch script
+**Decided by.** Panel, after asking whether the probe was in the repository. It was not.
+**Why it matters.** The project's answer to "how do you know the numbers are right, other
+than the tool saying so?" leaned on a probe written before the repository had any code,
+which reproduced the figures the brief gives. That probe lived in a scratch directory. It
+was therefore evidence a reviewer could not inspect, could not run, and would lose, and the
+original file had already been overwritten in place by later work. Quoting it was no better
+than quoting nothing.
+
+`scripts/oracle.py` is that check, rebuilt and committed. It parses the XML with regular
+expressions and the CSV by hand, merges per R1, R3 and R4, and routes by **enumerating**
+every minimum-hop path, where the shipped router counts paths over a predecessor graph and
+never builds one. It imports nothing from `netscope`.
+
+`backend/tests/test_oracle.py` asserts the two agree on the merged network, on every one of
+the 55 baseline link loads, and on both the measured impact and the R7 verdict for nine
+named failures. Verified to bite: reversing which end of an edge the shipped router counts
+from fails five of its tests. The oracle runs in 89ms, so this costs nothing.
+
+**What it still does not prove.** Both implementations were written from the same
+requirements by the same author, so a shared misreading survives both. It catches an
+implementation mistake, not a wrong assumption. That limit is stated in the oracle's own
+docstring rather than left for a reviewer to find.
+
+**Rejected.** Keeping the probe as a scratch script and describing its result. That is the
+practice this entry exists to end: evidence that cannot be re-run is an anecdote.
+
 ---
 
 ## Open questions

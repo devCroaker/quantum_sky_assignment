@@ -85,6 +85,10 @@ themselves:
   and never appears in shipped code.
 - The committed **criticality fixture**, 15 failure scenarios produced before any of the
   analysis code existed, which the sweep must reproduce exactly.
+- A **whole second implementation**, `scripts/oracle.py`, which parses the inputs itself and
+  routes by enumerating every path. It imports nothing from `netscope`, and
+  `backend/tests/test_oracle.py` asserts the two agree on the merged network, on all 55 link
+  loads, and on both the impact and the R7 verdict for nine named failures.
 
 The acceptance figures in the brief, 37 nodes, 55 links, 391 demands and 2068 units, are
 asserted as literals against the real files rather than computed from the thing under test.
