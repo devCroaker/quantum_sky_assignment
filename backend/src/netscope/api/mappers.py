@@ -28,9 +28,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from netscope import criticality
 from netscope.analysis import LinkUtilization, ScenarioAnalysis
 from netscope.api.schemas import (
+    Assessment,
+    CriticalityReason,
+    CriticalityResponse,
+    CriticalitySummary,
+    ElementKind,
     FailedSet,
+    FailureImpact,
     LinkLoad,
     LinkWire,
     NetworkResponse,
@@ -47,6 +54,7 @@ from netscope.models import Demand, Link, Network, Node
 
 __all__ = [
     "attaches_to_map",
+    "criticality_response",
     "link_load",
     "link_wire",
     "network_response",
@@ -55,6 +63,25 @@ __all__ = [
     "scenario_report",
     "stranded_demand",
 ]
+
+#: Domain reason to wire reason, spelled out rather than coerced through a
+#: shared string value, so a mismatch between the two enums (guarded against
+#: directly in ``test_criticality.py``) fails here with a ``KeyError`` rather
+#: than silently passing a value through.
+_REASON_MAP: Mapping[criticality.CriticalityReason, CriticalityReason] = {
+    criticality.CriticalityReason.PARTITIONS_NETWORK: CriticalityReason.PARTITIONS_NETWORK,
+    criticality.CriticalityReason.DEMANDS_UNDELIVERABLE: CriticalityReason.DEMANDS_UNDELIVERABLE,
+    criticality.CriticalityReason.ENDPOINT_DEMANDS_LOST: CriticalityReason.ENDPOINT_DEMANDS_LOST,
+    criticality.CriticalityReason.LINKS_OVERLOADED: CriticalityReason.LINKS_OVERLOADED,
+}
+
+#: Domain element kind to wire element kind. Both enums exist for the same
+#: layering reason the reasons do: ``netscope.criticality`` sits below
+#: ``api`` and may not import it.
+_KIND_MAP: Mapping[criticality.ElementKind, ElementKind] = {
+    criticality.ElementKind.NODE: ElementKind.NODE,
+    criticality.ElementKind.LINK: ElementKind.LINK,
+}
 
 
 def attaches_to_map(sites: tuple[ParsedSite, ...]) -> Mapping[str, tuple[str, ...]]:
@@ -173,5 +200,40 @@ def scenario_report(analysis: ScenarioAnalysis) -> ScenarioReport:
             units_delivered=analysis.units_delivered,
             units_undeliverable=analysis.units_undeliverable,
             units_endpoint_affected=analysis.units_endpoint_affected,
+        ),
+    )
+
+
+def failure_impact(impact: criticality.FailureImpact) -> FailureImpact:
+    return FailureImpact(
+        components=impact.components,
+        undeliverable_demands=impact.undeliverable_demands,
+        undeliverable_units=impact.undeliverable_units,
+        endpoint_affected_demands=impact.endpoint_affected_demands,
+        endpoint_affected_units=impact.endpoint_affected_units,
+        overloaded_links=impact.overloaded_links,
+        max_utilization=impact.max_utilization,
+    )
+
+
+def assessment(entry: criticality.Assessment) -> Assessment:
+    return Assessment(
+        kind=_KIND_MAP[entry.kind],
+        id=entry.id,
+        critical=entry.critical,
+        reasons=tuple(_REASON_MAP[reason] for reason in entry.reasons),
+        impact=failure_impact(entry.impact),
+    )
+
+
+def criticality_response(sweep: criticality.CriticalitySweep) -> CriticalityResponse:
+    """``GET /api/v1/criticality``: every assessment from one startup sweep."""
+    return CriticalityResponse(
+        assessments=tuple(assessment(entry) for entry in sweep.assessments),
+        summary=CriticalitySummary(
+            nodes_evaluated=sweep.summary.nodes_evaluated,
+            links_evaluated=sweep.summary.links_evaluated,
+            critical_nodes=sweep.summary.critical_nodes,
+            critical_links=sweep.summary.critical_links,
         ),
     )

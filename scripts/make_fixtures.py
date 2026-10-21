@@ -123,7 +123,11 @@ CITIES = {
 # Site positions are the centroid of their attachments nudged clear of the
 # city, which is the rule P8 will implement for real.
 SITES = {
-    "DC-NORTH": (NodeKind.DATA_CENTER, ("Hamburg", "Copenhagen"), Position(x=10.41, y=53.87)),
+    "DC-NORTH": (
+        NodeKind.DATA_CENTER,
+        ("Hamburg", "Copenhagen"),
+        Position(x=10.41, y=53.87),
+    ),
     "HUB-EAST": (NodeKind.AGGREGATION_HUB, ("Warsaw",), Position(x=21.39, y=51.74)),
     "OPS-EAST-1": (NodeKind.OPERATIONS_SITE, ("HUB-EAST",), Position(x=22.19, y=51.34)),
 }
@@ -160,7 +164,9 @@ BASELINE_LOADS = {
 
 def network() -> NetworkResponse:
     nodes = [
-        NodeWire(id=city, kind=NodeKind.BACKBONE_CITY, position=position, can_transit=True)
+        NodeWire(
+            id=city, kind=NodeKind.BACKBONE_CITY, position=position, can_transit=True
+        )
         for city, position in CITIES.items()
     ]
     nodes += [
@@ -207,7 +213,8 @@ def _ranked(loads: tuple[LinkLoad, ...], limit: int | None) -> tuple[RankedLink,
     if limit is not None:
         ordered = ordered[:limit]
     return tuple(
-        RankedLink(**entry.model_dump(), rank=rank) for rank, entry in enumerate(ordered, start=1)
+        RankedLink(**entry.model_dump(), rank=rank)
+        for rank, entry in enumerate(ordered, start=1)
     )
 
 
@@ -236,7 +243,9 @@ def baseline() -> ScenarioReport:
 def berlin_down() -> ScenarioReport:
     """Berlin carries every east-west path, so losing it strands both demands."""
     surviving = {
-        link_id: 0.0 for link_id, (endpoints, _, _) in LINKS.items() if "Berlin" not in endpoints
+        link_id: 0.0
+        for link_id, (endpoints, _, _) in LINKS.items()
+        if "Berlin" not in endpoints
     }
     loads = _loads(surviving)
     units = sum(d.volume for d in DEMANDS)
@@ -267,37 +276,108 @@ def berlin_down() -> ScenarioReport:
 #: Six of the seven nodes are critical and only Copenhagen is not, which is
 #: the fixture-scale version of what R7b's literal reading does to the real
 #: network. Three of the eight links are critical.
-CRITICALITY: dict[tuple[str, str], tuple[tuple[str, ...], int, int, float, int, float, int, float]] = {
+CRITICALITY: dict[
+    tuple[str, str], tuple[tuple[str, ...], int, int, float, int, float, int, float]
+] = {
     # Berlin carries every path between the two halves of this network.
-    ("node", "Berlin"): (("partitions-network", "demands-undeliverable"), 2, 2, 110.0, 0, 0.0, 0, 0.0),
+    ("node", "Berlin"): (
+        ("partitions-network", "demands-undeliverable"),
+        2,
+        2,
+        110.0,
+        0,
+        0.0,
+        0,
+        0.0,
+    ),
     # The only element of either kind that is not critical. Losing it leaves
     # both demands deliverable over their remaining minimum-hop paths.
     ("node", "Copenhagen"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
     # Critical only because it is an endpoint of D1, per R7b as written.
-    ("node", "DC-NORTH"): (("endpoint-demands-lost",), 1, 0, 0.0, 1, 10.0, 0, 100.0 / 550.0),
-    ("node", "HUB-EAST"): (("partitions-network", "demands-undeliverable"), 2, 1, 10.0, 0, 0.0, 0, 100.0 / 550.0),
+    ("node", "DC-NORTH"): (
+        ("endpoint-demands-lost",),
+        1,
+        0,
+        0.0,
+        1,
+        10.0,
+        0,
+        100.0 / 550.0,
+    ),
+    ("node", "HUB-EAST"): (
+        ("partitions-network", "demands-undeliverable"),
+        2,
+        1,
+        10.0,
+        0,
+        0.0,
+        0,
+        100.0 / 550.0,
+    ),
     ("node", "Hamburg"): (("endpoint-demands-lost",), 1, 0, 0.0, 1, 100.0, 0, 0.25),
-    ("node", "OPS-EAST-1"): (("endpoint-demands-lost",), 1, 0, 0.0, 1, 10.0, 0, 100.0 / 550.0),
+    ("node", "OPS-EAST-1"): (
+        ("endpoint-demands-lost",),
+        1,
+        0,
+        0.0,
+        1,
+        10.0,
+        0,
+        100.0 / 550.0,
+    ),
     # The only element that fires three reasons at once: it partitions the
     # network, strands D1 between two survivors, and is itself an endpoint
     # of D2.
     ("node", "Warsaw"): (
         ("partitions-network", "demands-undeliverable", "endpoint-demands-lost"),
-        2, 1, 10.0, 1, 100.0, 0, 0.0,
+        2,
+        1,
+        10.0,
+        1,
+        100.0,
+        0,
+        0.0,
     ),
     # DC-NORTH is dual-homed, so losing either access link costs nothing.
     ("link", "ACC-DC-NORTH-Copenhagen"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
     ("link", "ACC-DC-NORTH-Hamburg"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
     # The two single-homed access links. Each one isolates a site.
-    ("link", "ACC-HUB-EAST-Warsaw"): (("partitions-network", "demands-undeliverable"), 2, 1, 10.0, 0, 0.0, 0, 100.0 / 550.0),
-    ("link", "ACC-OPS-EAST-1-HUB-EAST"): (("partitions-network", "demands-undeliverable"), 2, 1, 10.0, 0, 0.0, 0, 100.0 / 550.0),
+    ("link", "ACC-HUB-EAST-Warsaw"): (
+        ("partitions-network", "demands-undeliverable"),
+        2,
+        1,
+        10.0,
+        0,
+        0.0,
+        0,
+        100.0 / 550.0,
+    ),
+    ("link", "ACC-OPS-EAST-1-HUB-EAST"): (
+        ("partitions-network", "demands-undeliverable"),
+        2,
+        1,
+        10.0,
+        0,
+        0.0,
+        0,
+        100.0 / 550.0,
+    ),
     # The three backbone links in the western triangle all have an
     # alternative, so none is critical.
     ("link", "L1"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
     ("link", "L2"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
     ("link", "L3"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
     # The one backbone link with no alternative: it is the only path east.
-    ("link", "L4"): (("partitions-network", "demands-undeliverable"), 2, 2, 110.0, 0, 0.0, 0, 0.0),
+    ("link", "L4"): (
+        ("partitions-network", "demands-undeliverable"),
+        2,
+        2,
+        110.0,
+        0,
+        0.0,
+        0,
+        0.0,
+    ),
 }
 
 
@@ -346,7 +426,9 @@ def main() -> int:
         "criticality.json": criticality(),
     }
     for name, model in written.items():
-        payload = json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        payload = (
+            json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        )
         (TARGET / name).write_text(payload, encoding="utf-8")
         print(f"wrote contracts/fixtures/{name}")
     return 0

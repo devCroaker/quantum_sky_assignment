@@ -7,7 +7,7 @@ BACKEND := backend
 FRONTEND := frontend
 
 .DEFAULT_GOAL := help
-.PHONY: help install install-backend install-frontend lint typecheck test check contract lock lock-check dev clean
+.PHONY: help install install-backend install-frontend lint typecheck test check contract findings lock lock-check dev clean
 
 help: ## Show the available targets
 	@grep -hE '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -54,6 +54,9 @@ lock-check: ## Fail if the lockfile and pyproject.toml disagree
 contract: ## Regenerate the wire contract and its fixtures
 	$(VENV)/bin/python scripts/export_contract.py
 	$(VENV)/bin/python scripts/make_fixtures.py
+
+findings: ## Regenerate docs/findings.md from the real input files
+	$(PY) scripts/findings.py
 
 dev: install ## Run the API and the front end together (the one documented command)
 	@./scripts/dev.sh
