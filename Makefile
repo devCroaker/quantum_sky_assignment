@@ -58,8 +58,8 @@ contract: ## Regenerate the wire contract and its fixtures
 findings: ## Regenerate docs/findings.md from the real input files
 	$(PY) scripts/findings.py
 
-dev: ## Run the API and the front end together (the one documented command)
-	@echo "dev target lands in P19, once both halves exist"
+dev: install ## Run the API and the front end together (the one documented command)
+	@./scripts/dev.sh
 
 clean: ## Remove build and cache artefacts
 	rm -rf $(VENV) $(FRONTEND)/node_modules $(FRONTEND)/dist
