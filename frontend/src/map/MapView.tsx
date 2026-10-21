@@ -341,7 +341,7 @@ export function MapView({
     [projected],
   );
 
-  const { toggle: toggleFailure } = useFailures();
+  const { toggle: toggleFailure, isFailed } = useFailures();
 
   const openCluster = clusters.find(
     (cluster) => clusterKey(cluster) === openClusterKey && cluster.members.length > 1,
@@ -429,13 +429,30 @@ export function MapView({
                 const criticalMemberCount = memberReasons.filter(
                   (reasons) => reasons.length > 0,
                 ).length;
+                // A cluster absorbs its members' glyphs, so without this a
+                // failed node inside one simply stops looking failed. On the
+                // real network seven of the 37 nodes sit in a cluster at the
+                // default view, so a reader could fail a node from the popover
+                // and watch the map not change, which is exactly the feedback
+                // R11 exists to give.
+                const failedMemberCount = cluster.members.filter((member) =>
+                  isFailed({ kind: 'node', id: member.id }),
+                ).length;
                 return (
                   <g
                     key={key}
                     ref={(el) => {
                       markerRefs.current.set(key, el);
                     }}
-                    className="cluster-marker"
+                    className={
+                      failedMemberCount > 0
+                        ? 'cluster-marker cluster-marker-failed'
+                        : 'cluster-marker'
+                    }
+                    data-failed={failedMemberCount > 0 ? 'true' : undefined}
+                    data-failed-members={
+                      failedMemberCount > 0 ? String(failedMemberCount) : undefined
+                    }
                     data-critical-reasons={
                       clusterReasons.length > 0 ? clusterReasons.join(' ') : undefined
                     }
@@ -447,7 +464,12 @@ export function MapView({
                     role="button"
                     aria-haspopup="menu"
                     aria-expanded={openClusterKey === key}
-                    aria-label={`${String(cluster.members.length)} nodes at this position`}
+                    aria-label={
+                      failedMemberCount > 0
+                        ? `${String(cluster.members.length)} nodes at this position, ` +
+                          `${String(failedMemberCount)} failed`
+                        : `${String(cluster.members.length)} nodes at this position`
+                    }
                     onMouseEnter={(event) => {
                       openNow(key, event.currentTarget);
                     }}
@@ -486,6 +508,12 @@ export function MapView({
                     ) : null}
                     {clusterReasons.length > 0 ? <ClusterWarningMarker /> : null}
                     <circle className="cluster-marker-ring" r={11} />
+                    {/*
+                      The same cross a failed node carries, so the encoding is
+                      one thing a reader learns once. Drawn at the cluster
+                      ring's radius rather than the glyph's.
+                    */}
+                    {failedMemberCount > 0 ? <FailedCross half={9} /> : null}
                     {/*
                       The count is text, which is what makes this marker legible without
                       colour (D21): a reader sees "3" before ever hovering, not a dot that

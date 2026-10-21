@@ -83,7 +83,7 @@ export function TopUtilizedPanel({
     <PanelSection
       id="top-utilized"
       title="Top five utilized"
-      lands="The five most utilized links, ranked by the server. Rank and utilization are shown exactly as returned, never recomputed here."
+      lands="The five most utilized links for the scenario on screen, ranked by the server, so this list changes when something is failed. Rank and utilization are shown exactly as returned, never recomputed here."
     >
       {report.most_utilized.length === 0 ? (
         <p className="panel-empty">No links carry any load in this scenario.</p>

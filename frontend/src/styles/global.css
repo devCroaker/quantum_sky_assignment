@@ -598,3 +598,13 @@ h2 {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
+
+/*
+ * A cluster with a failed member fades the same way a failed node does, so the
+ * two read as one encoding rather than two. The cross on top carries the
+ * meaning without colour, per D21.
+ */
+.cluster-marker-failed .cluster-marker-ring,
+.cluster-marker-failed .cluster-marker-count {
+  opacity: 0.35;
+}
