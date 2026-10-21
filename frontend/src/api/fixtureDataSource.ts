@@ -73,7 +73,7 @@ export function createFixtureDataSource(): NetworkDataSource {
         new Error(
           `that scenario is not available in fixture mode: ${describeRequest(request)}. ` +
             'The fixtures cover the empty failed set and the single node Berlin only. ' +
-            'Run with VITE_DATA_SOURCE=live once P13 lands.',
+            'Run with VITE_DATA_SOURCE=live to ask the back end, which answers any scenario.',
         ),
       );
     },

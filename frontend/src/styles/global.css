@@ -224,6 +224,115 @@ h2 {
   stroke: var(--focus);
 }
 
+/*
+ * R11 overlays: a failed element is faded and crossed out. The cross is a shape of its own,
+ * with no dash and no triangle, so it cannot be read as the critical marks above (D21).
+ * Fading is applied to the shape alone, so the cross and the label stay fully legible.
+ */
+.node-body-failed {
+  opacity: 0.35;
+}
+
+.failed-marker path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.link-failed {
+  opacity: 0.3;
+}
+
+.failed-tag {
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.failed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.failed-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.impact-block {
+  margin: 0.75rem 0 0;
+}
+
+.impact-heading {
+  margin: 0 0 0.3rem;
+  font-size: 0.85rem;
+}
+
+.impact-caption,
+.impact-pending,
+.impact-stale {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+}
+
+.impact-stale {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.impact-error {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 2px solid var(--ink);
+  border-radius: 3px;
+  font-size: 0.82rem;
+}
+
+.impact-error p {
+  margin: 0 0 0.3rem;
+}
+
+.impact-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.impact-table th,
+.impact-table td {
+  padding: 0.2rem 0.3rem;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+}
+
+.impact-totals {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem 0.75rem;
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.impact-totals dt {
+  color: var(--ink-muted);
+}
+
+.impact-totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .map-legend {
   display: flex;
   flex-wrap: wrap;

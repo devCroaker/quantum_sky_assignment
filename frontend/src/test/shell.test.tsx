@@ -35,12 +35,14 @@ describe('the shell', () => {
     render(<App source={createFixtureDataSource()} />);
 
     // P16 replaced the node-chip placeholder with the real map: seven SVG node glyphs
-    // (role="button", focusable), one per fixture node, instead of seven <button>s. The
-    // map itself has no clusters in the plain fixture, so these are the only "button" role
-    // elements the map contributes. Scoped to the map's own <svg>, since P17 adds buttons
-    // of its own to the Critical panel (one per critical row) that this test is not about.
+    // (role="button", focusable), one per fixture node. P18 made each link a focusable
+    // button too, so the glyphs are picked out by their data-node-id rather than counting
+    // every button in the map. Scoped to the map's own <svg>, since the panels add buttons
+    // of their own that this test is not about.
     const mapSvg = await screen.findByRole('application');
-    const glyphs = within(mapSvg).getAllByRole('button');
+    const glyphs = within(mapSvg)
+      .getAllByRole('button')
+      .filter((element) => element.hasAttribute('data-node-id'));
     expect(glyphs).toHaveLength(7);
     for (const glyph of glyphs) {
       expect(glyph.getAttribute('tabindex')).toBe('0');

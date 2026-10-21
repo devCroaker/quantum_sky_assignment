@@ -1,29 +1,49 @@
 import type { JSX } from 'react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { NetworkDataSource } from '../api';
+import type { CriticalityResponse, NetworkResponse, ScenarioReport } from '../api/types';
 import { MapView } from '../map/MapView';
 import { SidePanel } from '../panels/SidePanel';
+import type { FailureSet } from '../state/failedSet';
+import {
+  isFailedIn,
+  NOTHING_FAILED,
+  toScenarioRequest,
+  withRestored,
+  withToggled,
+} from '../state/failedSet';
+import type { FailureContextValue } from '../state/failureContext';
+import { FailureProvider } from '../state/failures';
 import { SelectionProvider } from '../state/selection';
-import type { CriticalityResponse, NetworkResponse, ScenarioReport } from '../api/types';
+import type { ElementRef } from '../state/selectionContext';
 
 /**
  * The shell: map on the left at roughly two thirds, persistent side panel on the right at
  * one third. The split is decided by the panel and lives in App.css, not here.
  *
- * The network, the criticality assessment and the baseline scenario are each loaded once
- * and do not depend on each other, so they are three independent effects rather than a
- * waterfall: the map can draw its topology before the criticality overlay (R10) or the top
- * five list (R10) resolve, and each side panel section shows its own placeholder until its
- * own data arrives (see SidePanel). P18 adds the failed set and the scenario request on top
- * of this; it will own that state, which is why the load here is deliberately the simplest
- * thing that works rather than a general cache.
+ * The network, the criticality assessment and the baseline are each loaded once and do not
+ * depend on each other. The failed set is held here and nowhere else (R11): every change to
+ * it posts the whole set to the scenario endpoint and keeps the answer. Restoring everything
+ * is a request with two empty lists, not a special case. The baseline is the answer for the
+ * empty set, so it is what is shown until the first change resolves.
  */
 export function App({ source }: { source: NetworkDataSource }): JSX.Element {
   const [network, setNetwork] = useState<NetworkResponse | null>(null);
   const [criticality, setCriticality] = useState<CriticalityResponse | null>(null);
   const [baseline, setBaseline] = useState<ScenarioReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [failed, setFailed] = useState<FailureSet>(NOTHING_FAILED);
+  // Mirrors `failed` synchronously. Two toggles in one tick must both see the first, and a
+  // state read from a closure would only see whatever the last render committed.
+  const failedRef = useRef<FailureSet>(NOTHING_FAILED);
+  const [scenario, setScenario] = useState<ScenarioReport | null>(null);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
+  const [scenarioPending, setScenarioPending] = useState(false);
+  // Each request takes the next number. A response is applied only if its number is still
+  // the latest, so an older answer that arrives late cannot overwrite a newer one.
+  const latestRequest = useRef(0);
 
   useEffect(() => {
     let live = true;
@@ -70,6 +90,65 @@ export function App({ source }: { source: NetworkDataSource }): JSX.Element {
     };
   }, [source]);
 
+  const applyFailed = useCallback(
+    (next: FailureSet) => {
+      failedRef.current = next;
+      setFailed(next);
+      latestRequest.current += 1;
+      const requestNumber = latestRequest.current;
+      setScenarioPending(true);
+      source.scenario(toScenarioRequest(next)).then(
+        (report) => {
+          if (requestNumber !== latestRequest.current) return;
+          setScenario(report);
+          setScenarioError(null);
+          setScenarioPending(false);
+        },
+        (reason: unknown) => {
+          // A rejected request leaves the failed set as the user set it, so it can still be
+          // restored. The report on screen stays the last one that resolved, and the Impact
+          // panel says which set that one answers.
+          if (requestNumber !== latestRequest.current) return;
+          setScenarioError(reason instanceof Error ? reason.message : String(reason));
+          setScenarioPending(false);
+        },
+      );
+    },
+    [source],
+  );
+
+  const toggle = useCallback(
+    (ref: ElementRef) => {
+      applyFailed(withToggled(failedRef.current, ref));
+    },
+    [applyFailed],
+  );
+
+  const restore = useCallback(
+    (ref: ElementRef) => {
+      applyFailed(withRestored(failedRef.current, ref));
+    },
+    [applyFailed],
+  );
+
+  const restoreAll = useCallback(() => {
+    applyFailed(NOTHING_FAILED);
+  }, [applyFailed]);
+
+  const failure = useMemo<FailureContextValue>(
+    () => ({
+      failed,
+      isFailed: (ref) => isFailedIn(failed, ref),
+      toggle,
+      restore,
+      restoreAll,
+    }),
+    [failed, toggle, restore, restoreAll],
+  );
+
+  // What the panels show: the latest answer that resolved, or the baseline before any change.
+  const report = scenario ?? baseline;
+
   return (
     <div className="app">
       <header className="app-header">
@@ -109,20 +188,28 @@ export function App({ source }: { source: NetworkDataSource }): JSX.Element {
       </header>
 
       <main className="app-body">
-        <SelectionProvider>
-          {network === null ? (
-            <section className="map" aria-labelledby="map-heading">
-              <h2 id="map-heading">Map</h2>
-            </section>
-          ) : (
-            <MapView
+        <FailureProvider value={failure}>
+          <SelectionProvider>
+            {network === null ? (
+              <section className="map" aria-labelledby="map-heading">
+                <h2 id="map-heading">Map</h2>
+              </section>
+            ) : (
+              <MapView
+                network={network}
+                criticality={criticality ?? undefined}
+                mostUtilized={report?.most_utilized}
+              />
+            )}
+            <SidePanel
               network={network}
-              criticality={criticality ?? undefined}
-              mostUtilized={baseline?.most_utilized}
+              criticality={criticality}
+              report={report}
+              scenarioPending={scenarioPending}
+              scenarioError={scenarioError}
             />
-          )}
-          <SidePanel network={network} criticality={criticality} baseline={baseline} />
-        </SelectionProvider>
+          </SelectionProvider>
+        </FailureProvider>
       </main>
     </div>
   );

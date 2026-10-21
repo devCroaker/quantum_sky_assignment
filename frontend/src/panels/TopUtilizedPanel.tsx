@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 
 import type { NetworkResponse, RankedLink, ScenarioReport } from '../api/types';
+import { useFailureToggle } from '../state/failureContext';
 import { useHighlightHandlers } from '../state/selectionContext';
 import { PanelSection } from './PanelSection';
 
@@ -25,19 +26,31 @@ function Row({
 }): JSX.Element {
   const { highlighted, onPointerEnter, onPointerLeave, onFocus, onBlur, onSelect } =
     useHighlightHandlers({ kind: 'link', id: ranked.link_id });
+  const { failed, toggle, onKeyDown } = useFailureToggle({
+    kind: 'link',
+    id: ranked.link_id,
+  });
   return (
     <tr
       className={highlighted ? 'is-highlighted' : undefined}
       data-rank={ranked.rank}
+      data-failed={failed ? 'true' : undefined}
       tabIndex={0}
       onMouseEnter={onPointerEnter}
       onMouseLeave={onPointerLeave}
       onFocus={onFocus}
       onBlur={onBlur}
-      onClick={onSelect}
+      onClick={() => {
+        onSelect();
+        toggle();
+      }}
+      onKeyDown={onKeyDown}
     >
       <td className="top-utilized-rank">{ranked.rank}</td>
-      <td>{ranked.link_id}</td>
+      <td>
+        {ranked.link_id}
+        {failed ? <span className="failed-tag"> failed</span> : null}
+      </td>
       <td>{endpoints !== undefined ? endpoints.join(' – ') : 'unknown'}</td>
       {/*
         Read straight off the payload, never recomputed: docs/api-contract.md's conventions
