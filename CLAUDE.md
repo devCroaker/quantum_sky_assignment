@@ -104,6 +104,59 @@ A demand lost because its own endpoint failed is reported, per R8, but does not 
 element critical. That was read the other way for a while and marked 37 of 37 nodes critical;
 see D24 before trusting a criticality figure from an older commit.
 
+## Delegating to a subagent
+
+A subagent starts cold. It has none of this conversation, none of the reasoning that led
+here, and no way to ask a quick question. **A brief that assumes any of that produces work
+that has to be redone.** Write every brief so that a smaller, cheaper model could execute it
+without further input, because that is the test of whether the brief is complete.
+
+A brief is not ready until it contains all seven of these.
+
+1. **What to read first**, in order, naming files. Always `CLAUDE.md`, then the plan entry,
+   then the decision log entries that bind the task, then the specific modules it builds on.
+2. **File ownership, both halves.** Which files the agent may create or edit, and which it
+   must not touch. Name the forbidden ones explicitly when other agents are running, because
+   two agents editing one file is a conflict nobody asked for. Tell it to **report** a file
+   that needs changing outside its scope rather than changing it.
+3. **The facts it needs, as measured values.** Never say "the network has some single points
+   of failure". Say which, with the numbers. An agent given a figure can check it; an agent
+   given a description has to guess.
+4. **Explicit permission to contradict you.** State that if a fact in the brief is false
+   against the data, it must say so plainly rather than adjusting a test to agree. This is
+   the single highest-value line in any brief here, for the reason below.
+5. **The acceptance check**, as the exact assertion that proves the task is done, not a
+   description of success.
+6. **The quality gates, as commands to run**, and the traps: `make install` rather than
+   `make install-backend`, mypy's strictness, that ruff formats before it checks.
+7. **Git rules.** Branch name, one commit, the message style, and **do not push, do not open
+   a pull request, do not merge, do not touch `main`**. Review happens before anything is
+   published.
+
+Then ask for a report back that names: the exact gate output, every judgement call it made
+that is not already in `docs/DECISIONS.md` with the alternative it rejected, and anything it
+could not do. **A limitation reported is cheap; a limitation hidden is a defect.**
+
+`docs/delegation.md` holds the briefing template and the evidence behind these rules.
+
+### Why rule 4 matters more than it looks
+
+Three briefs in this project contained a factual error, and an agent caught each one because
+it had been given a checkable value and told it was allowed to disagree:
+
+- A claim that one site row referred forward to a later row. It referred backwards.
+- A claim that losing `Warsaw` partitions the network. It does not, and finding out why
+  produced the most interesting result in the project.
+- A filter described as excluding a reason when it had to include two others. The wrong
+  version would have hidden three of the four nodes that matter, with plausible counts and a
+  passing test.
+
+Every one was caught by an agent checking the data instead of complying. None would have been
+caught by a type checker, a linter or a test written from the same wrong brief.
+
+**So: never put a number in a brief you have not run.** If you cannot measure it, say that it
+is unverified and ask the agent to establish it.
+
 ## Testing policy
 
 - Expected values are justified. Each non-obvious literal gets a comment or docstring saying

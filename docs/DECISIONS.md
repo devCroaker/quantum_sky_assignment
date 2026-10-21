@@ -390,6 +390,43 @@ stopped discriminating. It was a mitigation of a bad metric rather than a good m
 removing the cause removed the need for it. Keeping both would have left two ways to ask the
 same question.
 
+## D25. A subagent brief must be executable cold
+**Decided by.** Panel.
+**Rule in `CLAUDE.md`, template in `docs/delegation.md`.**
+
+Every brief handed to a subagent must be complete enough that a smaller, cheaper model could
+execute it without asking anything. Seven things are required: what to read first, file
+ownership stated both ways, the facts it needs as measured values, explicit permission to
+contradict the brief, the exact acceptance assertion, the gate commands with their traps, and
+the git rules including no push and no merge. The report back must name every judgement call
+and every limitation.
+
+**Why this is a rule and not advice.** Three briefs in this project contained a factual error,
+and an agent caught each one because it had a checkable value and had been told it could
+disagree: a site row described as a forward reference that pointed backwards, a claim that
+losing `Warsaw` partitions the network, and a filter described as excluding a reason when it
+had to include two others. None would have been caught by a type checker, a linter, or a test
+written from the same wrong brief. The last one would have silently hidden three of the four
+nodes that matter.
+
+The corollary is the strict part: **never put a number in a brief that has not been run.** If
+it cannot be measured, say it is unverified and ask the agent to establish it.
+
+**Why "a smaller model could execute it" is the test.** It is a statement about the brief, not
+about the model. A task that needs a larger model to interpret it is underspecified. The
+larger model's time belongs on reviewing output, designing the interfaces every other task
+builds against, and writing the briefs, since several defects in merged work were found by
+reading and running the result rather than by any gate.
+
+**Rejected.** Briefing conversationally and answering questions as they arise. It works with
+one agent and fails with four running in parallel worktrees, because each interruption is a
+context switch for the reviewer and a stall for the agent. It also leaves no artefact: a
+written brief can be checked against what came back, and a conversation cannot.
+
+**Not delegated under this rule.** Decisions belonging to the reviewer, the design of an
+interface every later task depends on, and anything hard to reverse. The foundation, the
+domain model and the wire contract were written directly for that reason.
+
 ---
 
 ## Open questions
