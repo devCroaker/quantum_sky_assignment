@@ -71,7 +71,6 @@ __all__ = [
 _REASON_MAP: Mapping[criticality.CriticalityReason, CriticalityReason] = {
     criticality.CriticalityReason.PARTITIONS_NETWORK: CriticalityReason.PARTITIONS_NETWORK,
     criticality.CriticalityReason.DEMANDS_UNDELIVERABLE: CriticalityReason.DEMANDS_UNDELIVERABLE,
-    criticality.CriticalityReason.ENDPOINT_DEMANDS_LOST: CriticalityReason.ENDPOINT_DEMANDS_LOST,
     criticality.CriticalityReason.LINKS_OVERLOADED: CriticalityReason.LINKS_OVERLOADED,
 }
 

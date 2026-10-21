@@ -43,9 +43,9 @@ function assessment(
 }
 
 describe('CriticalPanel', () => {
-  it('shows the fixture-derived headline counts (6 of 7 nodes, 3 of 8 links)', () => {
+  it('shows the fixture-derived headline counts (3 of 7 nodes, 3 of 8 links)', () => {
     renderPanel();
-    expect(screen.getByText(/6 of 7 nodes/)).toBeTruthy();
+    expect(screen.getByText(/3 of 7 nodes/)).toBeTruthy();
     expect(screen.getByText(/3 of 8 links/)).toBeTruthy();
   });
 
@@ -53,11 +53,9 @@ describe('CriticalPanel', () => {
     renderPanel();
     // Counted by hand from contracts/fixtures/criticality.json: partitions-network and
     // demands-undeliverable each apply to ACC-HUB-EAST-Warsaw, ACC-OPS-EAST-1-HUB-EAST,
-    // L4, Berlin, HUB-EAST and Warsaw (6); endpoint-demands-lost applies to DC-NORTH,
-    // Hamburg, OPS-EAST-1 and Warsaw (4); links-overloaded applies to none (0).
+    // L4, Berlin, HUB-EAST and Warsaw (6); links-overloaded applies to none (0).
     expect(screen.getByText(/Partitions the network \(6\)/)).toBeTruthy();
     expect(screen.getByText(/Leaves a demand undeliverable \(6\)/)).toBeTruthy();
-    expect(screen.getByText(/Only loses its own traffic \(4\)/)).toBeTruthy();
     expect(screen.getByText(/Overloads a surviving link \(0\)/)).toBeTruthy();
   });
 
@@ -66,9 +64,10 @@ describe('CriticalPanel', () => {
     const ids = Array.from(container.querySelectorAll('.critical-row-id')).map(
       (el) => el.textContent,
     );
-    // Exactly the structural nodes and links: the three nodes whose loss partitions the
-    // network or strands a demand, and the three links with the same reasons. DC-NORTH,
-    // Hamburg and OPS-EAST-1 (critical only via endpoint-demands-lost) must NOT appear.
+    // Every critical element: the three nodes whose loss partitions the network or
+    // strands a demand elsewhere, and the three links with the same reasons. DC-NORTH,
+    // Hamburg and OPS-EAST-1 lose only their own traffic, so under D24 they are not
+    // critical at all and cannot appear whatever the filter says.
     expect(ids.sort()).toEqual(
       [
         'ACC-HUB-EAST-Warsaw',
@@ -79,28 +78,23 @@ describe('CriticalPanel', () => {
         'Warsaw',
       ].sort(),
     );
-    // 9 total critical elements (6 nodes + 3 links, matching the fixture's own summary),
-    // 6 of them structural.
-    expect(screen.getByText('Showing 6 of 9 critical elements')).toBeTruthy();
+    // 6 critical elements in total, 3 nodes and 3 links, matching the fixture's own
+    // summary. Every reason is on by default now that each one describes harm to
+    // somebody else, so the default view hides nothing.
+    expect(screen.getByText('Showing 6 of 6 critical elements')).toBeTruthy();
   });
 
-  it('keeps a node that is both structural and endpoint-affected under the default filter', () => {
-    // This is the case that tells the correct (inclusive, OR-over-reasons) filter apart
-    // from the wrong one an earlier draft used (subtract out endpoint-demands-lost). A
-    // node that carries partitions-network ALONGSIDE endpoint-demands-lost, like Warsaw in
-    // the real network's Athens/Dublin/Warsaw, must still show under the default view: the
-    // wrong reading would drop it the moment it also happens to originate traffic, which
-    // is backwards. The committed 15-element fixture's own Warsaw already covers exactly
-    // this (see the test above); this fabricates a minimal case so the distinction cannot
-    // be missed by an implementation that coincidentally passes the fixture-based test.
+  it('shows a node matching any selected reason, not only one matching all of them', () => {
+    // The filter is an OR over the selected reasons, and this fabricates the case that
+    // tells that apart from an AND. A node carrying one selected reason must show even
+    // when it lacks the others; only a node carrying none of them is hidden. The
+    // committed fixture cannot distinguish the two readings, because every critical
+    // element in it carries both structural reasons, so the case is built by hand.
     const fabricated: CriticalityResponse = {
       assessments: [
-        assessment('OnlyStructural', 'node', ['partitions-network']),
-        assessment('StructuralAndEndpoint', 'node', [
-          'partitions-network',
-          'endpoint-demands-lost',
-        ]),
-        assessment('OnlyEndpoint', 'node', ['endpoint-demands-lost']),
+        assessment('PartitionsOnly', 'node', ['partitions-network']),
+        assessment('OverloadsOnly', 'node', ['links-overloaded']),
+        assessment('Both', 'node', ['partitions-network', 'links-overloaded']),
         assessment('NotCritical', 'node', []),
       ],
       summary: {
@@ -114,32 +108,35 @@ describe('CriticalPanel', () => {
     const ids = Array.from(container.querySelectorAll('.critical-row-id')).map(
       (el) => el.textContent,
     );
-    expect(ids.sort()).toEqual(['OnlyStructural', 'StructuralAndEndpoint'].sort());
-    expect(ids).not.toContain('OnlyEndpoint');
+    expect(ids.sort()).toEqual(['Both', 'OverloadsOnly', 'PartitionsOnly'].sort());
+    expect(ids).not.toContain('NotCritical');
   });
 
   it('matchesReasonFilter is inclusive (OR over reasons), the property the UI relies on', () => {
-    const structuralAndEndpoint = assessment('x', 'node', [
-      'partitions-network',
-      'endpoint-demands-lost',
-    ]);
-    const onlyEndpoint = assessment('y', 'node', ['endpoint-demands-lost']);
-    expect(matchesReasonFilter(structuralAndEndpoint, DEFAULT_REASONS)).toBe(true);
-    expect(matchesReasonFilter(onlyEndpoint, DEFAULT_REASONS)).toBe(false);
+    const partitionsOnly = assessment('x', 'node', ['partitions-network']);
+    const notCritical = assessment('y', 'node', []);
+    expect(matchesReasonFilter(partitionsOnly, DEFAULT_REASONS)).toBe(true);
+    expect(
+      matchesReasonFilter(partitionsOnly, new Set(['links-overloaded'] as const)),
+    ).toBe(false);
+    expect(matchesReasonFilter(notCritical, DEFAULT_REASONS)).toBe(false);
   });
 
-  it('changes the filtered list and its count when a reason checkbox is toggled', () => {
+  it('narrows the list only when every reason an element carries is cleared', () => {
     renderPanel();
-    expect(screen.getByText('Showing 6 of 9 critical elements')).toBeTruthy();
+    expect(screen.getByText('Showing 6 of 6 critical elements')).toBeTruthy();
 
-    const endpointCheckbox = screen.getByLabelText(/Only loses its own traffic/);
-    endpointCheckbox.click();
+    // Every critical element in this fixture carries BOTH structural reasons, so
+    // clearing one changes nothing. That is worth asserting rather than assuming,
+    // because it is the inclusive filter behaving correctly: an element shows while
+    // any selected reason still matches.
+    screen.getByLabelText(/Partitions the network/).click();
+    expect(screen.getByText('Showing 6 of 6 critical elements')).toBeTruthy();
+    within(screen.getByRole('list')).getByText('Warsaw');
 
-    expect(screen.getByText('Showing 9 of 9 critical elements')).toBeTruthy();
-    // Now visible: the three endpoint-only critical elements that were hidden by default.
-    const list = screen.getByRole('list');
-    within(list).getByText('DC-NORTH');
-    within(list).getByText('Hamburg');
-    within(list).getByText('OPS-EAST-1');
+    // Clearing the second one empties the list, since nothing in this network
+    // overloads a link.
+    screen.getByLabelText(/Leaves a demand undeliverable/).click();
+    expect(screen.getByText('Showing 0 of 6 critical elements')).toBeTruthy();
   });
 });

@@ -82,12 +82,17 @@ class TestCriticalityEndpoint:
         CriticalityResponse.model_validate(response.json())
 
     def test_counts_match_the_sweep(self, real_client: TestClient) -> None:
-        """92 assessments: 37 nodes and 55 links, all 37 nodes critical."""
+        """92 assessments: 37 nodes and 55 links, 6 of each critical.
+
+        Six nodes, not 37. The project briefly counted a node as critical for
+        losing its own traffic, which caught every node that originates any
+        (D24). Criticality now means the loss costs somebody else something.
+        """
         body = CriticalityResponse.model_validate(real_client.get("/api/v1/criticality").json())
         assert len(body.assessments) == 92
         assert body.summary.nodes_evaluated == 37
         assert body.summary.links_evaluated == 55
-        assert body.summary.critical_nodes == 37
+        assert body.summary.critical_nodes == 6
         assert body.summary.critical_links == 6
 
     def test_critical_link_ids(self, real_client: TestClient) -> None:
@@ -97,7 +102,7 @@ class TestCriticalityEndpoint:
         assert {a.id for a in links if a.critical} == CRITICAL_LINK_IDS
 
     def test_reasons_by_kind_and_reason(self, real_client: TestClient) -> None:
-        """By-reason breakdown from the brief: 3/3, 4/4, 36/0, 2/2."""
+        """By-reason breakdown, measured against the real data: 3/3, 4/4, 2/2."""
         body = CriticalityResponse.model_validate(real_client.get("/api/v1/criticality").json())
         nodes = [a for a in body.assessments if a.kind.value == "node"]
         links = [a for a in body.assessments if a.kind.value == "link"]
@@ -109,8 +114,6 @@ class TestCriticalityEndpoint:
         assert count(links, "partitions-network") == 3
         assert count(nodes, "demands-undeliverable") == 4
         assert count(links, "demands-undeliverable") == 4
-        assert count(nodes, "endpoint-demands-lost") == 36
-        assert count(links, "endpoint-demands-lost") == 0
         assert count(nodes, "links-overloaded") == 2
         assert count(links, "links-overloaded") == 2
 
@@ -123,11 +126,16 @@ class TestCriticalityEndpoint:
         }
         assert overloaded_links == {"L12", "L26"}
 
-    def test_no_link_carries_endpoint_demands_lost(self, real_client: TestClient) -> None:
-        """Losing a link never removes a node (docs/api-contract.md, fixtures section)."""
+    def test_no_link_loses_a_demand_to_its_own_endpoint(self, real_client: TestClient) -> None:
+        """Losing a link never removes a node, so the bucket must be empty.
+
+        Checked on the impact figures rather than the reasons, because losing
+        your own traffic is no longer a reason for being critical.
+        """
         body = CriticalityResponse.model_validate(real_client.get("/api/v1/criticality").json())
         links = [a for a in body.assessments if a.kind.value == "link"]
-        assert all("endpoint-demands-lost" not in [r.value for r in a.reasons] for a in links)
+        assert len(links) == 55
+        assert all(a.impact.endpoint_affected_demands == 0 for a in links)
 
     def test_criticality_is_identical_across_two_requests(self, real_client: TestClient) -> None:
         """Proves the sweep is cached, not recomputed, matching R1's "once"."""

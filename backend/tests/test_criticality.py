@@ -194,40 +194,67 @@ class TestRealNetwork:
         assert result.summary.nodes_evaluated == 37
         assert result.summary.links_evaluated == 55
 
-    def test_every_node_is_critical(self, real_network: Network) -> None:
-        """All 37 of 37 nodes are critical, the literal reading of R7b.
+    def test_six_of_thirty_seven_nodes_are_critical(self, real_network: Network) -> None:
+        """Only an element whose loss hurts somebody else is critical.
 
-        36 nodes are endpoints of some demand (file A is a full mesh of 28
-        cities and R4 gives every site a demand under R4), so losing any one
-        of them strands at least its own traffic under the panel's literal
-        R7b reading (see docs/DECISIONS.md D12 and the R7b discussion).
-        HUB-EAST is the single exception: it forwards traffic but originates
-        none, so it is critical instead because losing it partitions the
-        network.
+        Four nodes break something structurally: `Athens`, `Dublin` and
+        `HUB-EAST` partition the network, and `Warsaw` strands two demands
+        between nodes that both survive. Two more, `Berlin` and `Hamburg`,
+        drive a surviving link over capacity. Six in total.
 
-        This is exactly what docs/api-contract.md predicts the literal
-        reading costs, and it is why the four reason codes exist: the
-        ``critical`` flag alone cannot tell a genuine single point of
-        failure from a node that merely sends traffic. Filtering for
-        ``PARTITIONS_NETWORK`` or ``DEMANDS_UNDELIVERABLE``, per the
-        contract's own reading instructions, recovers that short, useful
-        list. ``ENDPOINT_DEMANDS_LOST`` alone is not a useful filter here,
-        because the four structural nodes also originate their own demands
-        and so carry it too, alongside their structural reasons.
+        This test replaced one asserting 37 of 37. The project briefly read
+        R7b literally, so that a demand lost because its own endpoint failed
+        counted too. Every node that originates traffic was then critical,
+        which on this network is 36 of the 37, with `HUB-EAST` critical for
+        partitioning instead. The count could not be lower whatever the
+        network looked like, so it described the demand matrix rather than
+        the network, and the panel reverted it (docs/DECISIONS.md D24).
+
+        The endpoint-affected traffic is still reported, in `FailureImpact`
+        and as its own bucket in a scenario report, because R8 requires that.
+        It is simply not a reason for being critical. The test below pins
+        that distinction on `Hamburg`, which is critical for overloading a
+        link while also losing 100 units of its own traffic.
         """
         result = sweep(real_network)
         nodes = [a for a in result.assessments if a.kind is ElementKind.NODE]
         assert len(nodes) == 37
-        assert result.summary.critical_nodes == 37
-        assert all(a.critical for a in nodes)
+        assert result.summary.critical_nodes == 6
+        assert {a.id for a in nodes if a.critical} == {
+            "Athens",
+            "Berlin",
+            "Dublin",
+            "HUB-EAST",
+            "Hamburg",
+            "Warsaw",
+        }
 
-        structural = [
-            a
-            for a in nodes
-            if CriticalityReason.PARTITIONS_NETWORK in a.reasons
-            or CriticalityReason.DEMANDS_UNDELIVERABLE in a.reasons
-        ]
-        assert {a.id for a in structural} == {"Athens", "Dublin", "HUB-EAST", "Warsaw"}
+    def test_losing_only_your_own_traffic_is_reported_but_is_not_a_reason(
+        self, real_network: Network
+    ) -> None:
+        """The distinction the revert turned on, pinned on two real nodes.
+
+        `Amsterdam` originates traffic and nothing else: losing it costs its
+        own demands and breaks nothing for anyone still there, so it is not
+        critical, and its endpoint-affected figures are still filled in.
+
+        `Hamburg` loses its own traffic too, and is critical anyway, but only
+        for overloading a surviving link. Its reasons must not mention the
+        traffic it originates.
+        """
+        result = sweep(real_network)
+        by_id = {a.id: a for a in result.assessments if a.kind is ElementKind.NODE}
+
+        amsterdam = by_id["Amsterdam"]
+        assert not amsterdam.critical
+        assert amsterdam.reasons == ()
+        assert amsterdam.impact.endpoint_affected_demands > 0
+        assert amsterdam.impact.endpoint_affected_units > 0.0
+
+        hamburg = by_id["Hamburg"]
+        assert hamburg.critical
+        assert hamburg.reasons == (CriticalityReason.LINKS_OVERLOADED,)
+        assert hamburg.impact.endpoint_affected_units > 0.0
 
     def test_critical_links(self, real_network: Network) -> None:
         result = sweep(real_network)
@@ -258,7 +285,6 @@ class TestRealNetwork:
             "HUB-EAST",
             "Warsaw",
         }
-        assert len(ids_with(CriticalityReason.ENDPOINT_DEMANDS_LOST)) == 36
         assert ids_with(CriticalityReason.LINKS_OVERLOADED) == {"Berlin", "Hamburg"}
 
     def test_reasons_by_kind_and_reason_for_links(self, real_network: Network) -> None:
@@ -281,17 +307,20 @@ class TestRealNetwork:
         }
         assert ids_with(CriticalityReason.LINKS_OVERLOADED) == {"L12", "L26"}
 
-    def test_no_link_ever_carries_endpoint_demands_lost(self, real_network: Network) -> None:
+    def test_no_link_ever_loses_a_demand_to_its_own_endpoint(self, real_network: Network) -> None:
         """Losing a link never removes a node, so no demand can lose an endpoint.
 
         Asserted across all 55 links, not spot-checked, because this is a
         structural guarantee of R8's definition of "endpoint-affected", not
-        a coincidence of this particular network.
+        a coincidence of this particular network. It is checked on the impact
+        figures rather than on the reasons, because losing your own traffic is
+        no longer a reason for being critical.
         """
         result = sweep(real_network)
         links = [a for a in result.assessments if a.kind is ElementKind.LINK]
         assert len(links) == 55
-        assert all(CriticalityReason.ENDPOINT_DEMANDS_LOST not in a.reasons for a in links)
+        assert all(a.impact.endpoint_affected_demands == 0 for a in links)
+        assert all(a.impact.endpoint_affected_units == 0.0 for a in links)
 
     def test_warsaw_strands_demands_without_partitioning(self, real_network: Network) -> None:
         """Warsaw is the D12 finding: it strands two demands but splits nothing.

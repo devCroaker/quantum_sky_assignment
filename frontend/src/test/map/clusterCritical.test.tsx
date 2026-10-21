@@ -61,8 +61,10 @@ describe('a cluster containing a critical node', () => {
     const marker = container.querySelector('.cluster-marker');
     expect(marker).not.toBeNull();
 
-    // Both members are critical in the fixture, so the union of their reasons
-    // must appear rather than only the first member's.
+    // HUB-EAST is critical and OPS-EAST-1 is not, so the marker must carry
+    // HUB-EAST's reasons and count exactly one critical member. Taking the union
+    // is what makes that work without the marker having to know which member
+    // mattered.
     const reasons = marker?.getAttribute('data-critical-reasons')?.split(' ') ?? [];
     const expected = new Set(
       ['HUB-EAST', 'OPS-EAST-1'].flatMap(
@@ -72,7 +74,7 @@ describe('a cluster containing a critical node', () => {
       ),
     );
     expect(new Set(reasons)).toEqual(expected);
-    expect(marker?.getAttribute('data-critical-members')).toBe('2');
+    expect(marker?.getAttribute('data-critical-members')).toBe('1');
 
     // D21: the meaning must survive greyscale, so shape carries it too.
     expect(marker?.querySelector('.critical-ring')).not.toBeNull();
@@ -86,9 +88,9 @@ describe('a cluster containing a critical node', () => {
     if (copenhagen === undefined || hamburg === undefined) {
       throw new Error('fixture changed: expected Copenhagen and Hamburg');
     }
-    // Copenhagen is the one node the fixture reports as not critical. Move it
-    // onto Hamburg, which is critical only for losing its own traffic, and
-    // confirm the marker reports exactly that rather than nothing or everything.
+    // Neither Copenhagen nor Hamburg is critical: Copenhagen costs nothing when
+    // lost and Hamburg costs only its own traffic, which R7 no longer counts.
+    // A cluster of the two must therefore carry no criticality marking at all.
     const network: NetworkResponse = {
       ...base,
       nodes: base.nodes.map((node) =>
@@ -109,7 +111,9 @@ describe('a cluster containing a critical node', () => {
     );
 
     const marker = container.querySelector('.cluster-marker');
-    expect(marker?.getAttribute('data-critical-members')).toBe('1');
-    expect(marker?.getAttribute('data-critical-reasons')).toBe('endpoint-demands-lost');
+    expect(marker).not.toBeNull();
+    expect(marker?.getAttribute('data-critical-members')).toBeNull();
+    expect(marker?.getAttribute('data-critical-reasons')).toBeNull();
+    expect(marker?.querySelector('.critical-ring')).toBeNull();
   });
 });

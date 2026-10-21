@@ -209,30 +209,30 @@ class ScenarioReport(Wire):
 
 
 class CriticalityReason(StrEnum):
-    """Why an element is critical. R7 gives three reasons; we report four.
+    """Why an element is critical: the three ways losing it hurts someone else.
 
-    R7b says an element is critical if losing it leaves any demand
-    undeliverable, and the panel confirmed the literal reading: a demand
-    lost because its own endpoint went away counts. That is why
-    ``ENDPOINT_DEMANDS_LOST`` exists as a reason of its own rather than being
-    folded into ``DEMANDS_UNDELIVERABLE``.
+    R7 gives three reasons and these are they. An element is critical when its
+    loss partitions the network, strands a demand between two nodes that both
+    survive, or drives a surviving link over capacity.
 
-    Splitting it matters because of what the literal reading costs. Every
-    node that originates traffic becomes critical the moment it fails, which
-    is 36 of the 37 nodes in the real network, since file A is a full mesh of
-    all 28 cities and R4 gives every site a demand. Only the aggregation hub
-    escapes, because it forwards traffic but originates none. The ``critical``
-    flag therefore stops discriminating, exactly as R7b specifies.
+    What is deliberately **not** here is a demand lost because its own endpoint
+    failed. That is reported, in ``FailureImpact.endpoint_affected_demands``
+    and as its own bucket in ``ScenarioReport``, because R8 requires it to be
+    reported separately. It just does not make an element critical.
 
-    Keeping the reason separate is what preserves the signal underneath. A
-    reader who wants the genuine single points of failure filters for
-    ``PARTITIONS_NETWORK`` or ``DEMANDS_UNDELIVERABLE``; a reader who wants
-    R7b as written reads the flag. Neither has to recompute anything.
+    The project ran for a while with the opposite reading, under which a node
+    was critical if losing it stranded any demand at all, including its own.
+    That is the literal text of R7b, and it was tried. It marked 37 of the
+    real network's 37 nodes critical, because 36 of them originate traffic and
+    the thirty-seventh partitions the graph, so the flag could not be lower
+    whatever the network looked like and said nothing about its shape. The
+    panel reverted it. Criticality now means "losing this hurts somebody
+    else", which is the question an operations team was actually asking.
+
     """
 
     PARTITIONS_NETWORK = "partitions-network"
     DEMANDS_UNDELIVERABLE = "demands-undeliverable"
-    ENDPOINT_DEMANDS_LOST = "endpoint-demands-lost"
     LINKS_OVERLOADED = "links-overloaded"
 
 

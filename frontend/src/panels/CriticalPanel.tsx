@@ -54,7 +54,7 @@ function Row({ assessment }: { assessment: Assessment }): JSX.Element {
 /**
  * Critical elements (R10), grouped by why rather than listed flat.
  *
- * On the real network every node but HUB-EAST is critical under the literal R7b reading
+ * On the real network 6 of the 37 nodes are critical, and 6 of the 55 links
  * (docs/api-contract.md, decision 3b), because file A is a full mesh and every site
  * originates a demand: a flat list of 36 names is not a useful answer to "where are the
  * single points of failure". Filtering to the structural reasons, `partitions-network` and
@@ -98,7 +98,7 @@ export function CriticalPanel({
     <PanelSection
       id="critical"
       title="Critical"
-      lands={`${String(summary.critical_nodes)} of ${String(summary.nodes_evaluated)} nodes and ${String(summary.critical_links)} of ${String(summary.links_evaluated)} links are critical under R7. Structural reasons are shown by default; every reason is one checkbox away.`}
+      lands={`${String(summary.critical_nodes)} of ${String(summary.nodes_evaluated)} nodes and ${String(summary.critical_links)} of ${String(summary.links_evaluated)} links are critical under R7, meaning their loss costs somebody else something. Narrow by reason below.`}
     >
       <fieldset className="critical-filter">
         <legend>Show reasons</legend>

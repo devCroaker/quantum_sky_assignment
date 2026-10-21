@@ -10,7 +10,7 @@ Merged network: 37 nodes, 55 links, 391 demands totalling 2068.0 units.
 
 ## 1. Where does the network have single points of failure?
 
-Of 37 nodes, 37 are critical under R7. Of 55 links, 6 are critical.
+Of 37 nodes, 6 are critical under R7. Of 55 links, 6 are critical.
 
 ### Breakdown by reason
 
@@ -18,19 +18,20 @@ Of 37 nodes, 37 are critical under R7. Of 55 links, 6 are critical.
 |---|---|---|---|---|
 | `partitions-network` | 3 | `Athens`, `Dublin`, `HUB-EAST` | 3 | `ACC-OPS-EAST-1-HUB-EAST`, `ACC-OPS-SOUTHEAST-Athens`, `ACC-OPS-WEST-Dublin` |
 | `demands-undeliverable` | 4 | `Athens`, `Dublin`, `HUB-EAST`, `Warsaw` | 4 | `ACC-HUB-EAST-Warsaw`, `ACC-OPS-EAST-1-HUB-EAST`, `ACC-OPS-SOUTHEAST-Athens`, `ACC-OPS-WEST-Dublin` |
-| `endpoint-demands-lost` | 36 | 36 elements, too many to list usefully here | 0 | none |
 | `links-overloaded` | 2 | `Berlin`, `Hamburg` | 2 | `L12`, `L26` |
 
-### The headline, and why it needs a second list
+### What counts as critical, and what does not
 
-**Every one of the 37 nodes is critical** under the panel's reading of R7b (see `docs/DECISIONS.md` D12): 36 of them originate a demand of their own (file A is a full mesh and R4 gives every site a demand), so losing any one of them strands at least its own traffic. The remaining one, `HUB-EAST`, escapes that reason only because it forwards traffic rather than originating it, and is critical anyway because losing it partitions the network. A flat count of 37 of 37 therefore answers nothing: it cannot be lower, whatever the network's actual shape, because it is dominated by a rule about who happens to send traffic.
+**6 of 37 nodes and 6 of 55 links are critical.** An element is critical when losing it costs somebody else something: it partitions the surviving graph, it strands a demand between two nodes that are both still there, or it drives a surviving link over capacity.
 
-The list that does answer the question is the one filtered to the two reasons that are about the network's structure rather than about who originates traffic: an element that partitions the surviving graph, or one that strands a demand between two nodes that are both still there.
+Traffic that a failed node was itself sending or receiving is reported separately, in the endpoint-affected figures, because R8 requires that. It does not make the node critical. An earlier version of this analysis counted it, which is the literal text of R7b, and the result was that every node originating any traffic was critical: 37 of 37 here. That number could not be lower whatever the network looked like, so it described the demand matrix rather than the network, and it was reverted (`docs/DECISIONS.md` D24).
+
+The elements whose loss breaks something structurally, as opposed to overloading a link:
 
 - **Nodes** (4): `Athens`, `Dublin`, `HUB-EAST`, `Warsaw`
 - **Links** (4): `ACC-HUB-EAST-Warsaw`, `ACC-OPS-EAST-1-HUB-EAST`, `ACC-OPS-SOUTHEAST-Athens`, `ACC-OPS-WEST-Dublin`
 
-The two lists differ because `ENDPOINT_DEMANDS_LOST` fires whenever the failed element is itself one end of a demand, which on this network is almost every node, while `PARTITIONS_NETWORK` and `DEMANDS_UNDELIVERABLE` only fire when some *other* pair of surviving nodes loses its path. The first measures who talks; the second measures what breaks. That is the distinction the slide has to carry.
+The remaining critical elements are the ones that overload a surviving link rather than cutting anything off. They matter for a different reason: nothing is unreachable, but a link is carrying more than it can.
 
 ### Warsaw: the case a connectivity check gets wrong
 

@@ -63,7 +63,7 @@ Cite the requirement id in the commit message and the pull request description.
 | R4 | Each operations site sends 10 to each data center. Data centers exchange 50 | `loaders/merge.py` |
 | R5 | Route over minimum-hop paths, splitting the demand equally per path | `routing.py` |
 | R6 | Only backbone cities and the aggregation hub forward traffic | `routing.py`, `models.py` |
-| R7 | Critical if losing it partitions, strands a demand, or overloads a link | `analysis.py` |
+| R7 | Critical if losing it partitions, strands a demand elsewhere, or overloads a link. Losing only its own traffic does not count, see D24 | `criticality.py` |
 | R8 | Per-failure report. Endpoint-affected demands listed separately | `analysis.py` |
 | R9 | Map laid out from coordinates, each site near its attachments | `loaders/geometry.py`, `frontend/src/map` |
 | R10 | Show critical elements and the five most utilized, not by colour alone | `frontend/src/panels` |
@@ -89,12 +89,20 @@ wrong until proven otherwise.
 The backbone being 2-connected is the key structural finding: every single point of failure
 in the merged network comes from the added sites, not from the backbone.
 
-Three nodes partition the graph when lost, `Athens`, `Dublin` and `HUB-EAST`, along with the
-three access links serving those single-homed sites. `Warsaw` does **not**, because
-`OPS-EAST-2` attaches to both `HUB-EAST` and `Budapest` and so accidentally dual-homes the
-hub. The hub is still cut off operationally, because `OPS-EAST-2` may not forward traffic
-under R6, so `Warsaw` is critical under R7b and not under R7a. Do not assume a connectivity
-check answers the resilience question on this network.
+Six of the 37 nodes and six of the 55 links are critical. Three nodes partition the graph
+when lost, `Athens`, `Dublin` and `HUB-EAST`, along with the three access links serving those
+single-homed sites. `Warsaw` strands a demand without partitioning anything, and `Berlin` and
+`Hamburg` are critical only for overloading a surviving link.
+
+`Warsaw` is the case to understand. It partitions **nothing**, because `OPS-EAST-2` attaches
+to both `HUB-EAST` and `Budapest` and so accidentally dual-homes the hub. The hub is still cut
+off operationally, because `OPS-EAST-2` may not forward traffic under R6, so two demands die
+while the graph stays in one piece. `Warsaw` is critical under R7b and not under R7a. Do not
+assume a connectivity check answers the resilience question on this network.
+
+A demand lost because its own endpoint failed is reported, per R8, but does not make an
+element critical. That was read the other way for a while and marked 37 of 37 nodes critical;
+see D24 before trusting a criticality figure from an older commit.
 
 ## Testing policy
 

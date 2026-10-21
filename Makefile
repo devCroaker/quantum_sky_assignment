@@ -31,8 +31,12 @@ install-frontend: ## Install the front end, once it exists
 	fi
 
 lint: ## Lint and format-check both halves
-	$(VENV)/bin/ruff check $(BACKEND)
-	$(VENV)/bin/ruff format --check $(BACKEND)
+# scripts/ is included because it generates committed artefacts, the contract
+# and the findings report, so it is production code by any useful definition.
+# It was outside the gate until the R7b revert touched it and two sorting
+# errors surfaced that nothing would have caught.
+	$(VENV)/bin/ruff check $(BACKEND) scripts
+	$(VENV)/bin/ruff format --check $(BACKEND) scripts
 	@if [ -f $(FRONTEND)/package.json ]; then cd $(FRONTEND) && npm run lint; fi
 
 typecheck: ## Type-check both halves

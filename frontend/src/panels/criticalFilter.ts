@@ -4,38 +4,30 @@ export const REASONS: readonly CriticalityReason[] = [
   'partitions-network',
   'demands-undeliverable',
   'links-overloaded',
-  'endpoint-demands-lost',
 ];
 
 export const REASON_LABEL: Record<CriticalityReason, string> = {
   'partitions-network': 'Partitions the network',
   'demands-undeliverable': 'Leaves a demand undeliverable',
   'links-overloaded': 'Overloads a surviving link',
-  'endpoint-demands-lost': 'Only loses its own traffic',
 };
 
 /**
- * The structural reading of R7b, the default view: an element whose loss partitions the
- * network (`partitions-network`) or strands a demand somewhere else in it
- * (`demands-undeliverable`), as opposed to one that is critical only because it is the
- * endpoint of its own now-undeliverable demand (`endpoint-demands-lost`). This is docs/
- * api-contract.md decision 3b's own description of the genuine single points of failure.
+ * Every reason is shown by default, because every reason now describes harm to
+ * somebody else: the element partitions the network, strands a demand between
+ * two surviving nodes, or drives a surviving link over capacity.
  *
- * Built by OR-ing these two reasons in, never by subtracting `endpoint-demands-lost` out.
- * Subtracting it would also drop every node that carries it alongside a structural reason,
- * which on the real network is Athens, Dublin and Warsaw: the three nodes that both
- * partition the network AND originate their own traffic, and so exactly the nodes an
- * operations lead most needs to see. See CriticalPanel.test.tsx for the fabricated case
- * that tells the two readings apart; the committed 15-element fixture happens not to,
- * which is itself worth recording.
- *
- * `links-overloaded` (R7c) is a genuine failure mode too but is left off the default,
- * matching the two reasons named in decision 3b exactly; it is one checkbox away, with its
- * own count, for a reader who wants it.
+ * This used to be a filter that hid noise. A fourth reason, `endpoint-demands-lost`,
+ * made an element critical merely for originating traffic, which marked 37 of the
+ * real network's 37 nodes critical and left the panel's default view as the only
+ * way to see the few that mattered. The panel reverted that reading, so the noise
+ * is gone and these checkboxes narrow rather than rescue: a reader who wants only
+ * the elements that partition the network can ask for those alone.
  */
 export const DEFAULT_REASONS: ReadonlySet<CriticalityReason> = new Set([
   'partitions-network',
   'demands-undeliverable',
+  'links-overloaded',
 ]);
 
 export function countsByReason(
@@ -45,7 +37,6 @@ export function countsByReason(
     'partitions-network': 0,
     'demands-undeliverable': 0,
     'links-overloaded': 0,
-    'endpoint-demands-lost': 0,
   };
   for (const assessment of assessments) {
     for (const reason of assessment.reasons ?? []) {

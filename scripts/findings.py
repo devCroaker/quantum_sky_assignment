@@ -44,9 +44,9 @@ SNDLIB_PATH = ROOT / "data" / "nobel-eu.xml"
 SITES_PATH = ROOT / "data" / "sites.csv"
 
 #: A per-reason element list is only useful in the document when it is short.
-#: 36 of 37 nodes carry ENDPOINT_DEMANDS_LOST, which is exactly the case this
-#: threshold is meant to suppress; every other reason in this network lists
-#: 2 to 4 elements.
+#: Every reason in this network lists 2 to 4 elements, so the threshold does
+#: not bite today. It is kept because a denser network would make one of these
+#: lists long enough to be unreadable.
 _MAX_LISTED_IDS = 10
 
 #: How many links to show in the "busiest at rest" table (R10 shows five on
@@ -168,40 +168,38 @@ def _question_one(network: Network, criticality: CriticalitySweep) -> str:
 
     lines.extend(
         [
-            "### The headline, and why it needs a second list\n",
+            "### What counts as critical, and what does not\n",
             (
-                f"**Every one of the {criticality.summary.nodes_evaluated} nodes is "
-                "critical** under the panel's reading of R7b (see `docs/DECISIONS.md` "
-                "D12): "
-                f"{len(_ids_with(nodes, CriticalityReason.ENDPOINT_DEMANDS_LOST))} of "
-                "them originate a demand of their own (file A is a full mesh and R4 "
-                "gives every site a demand), so losing any one of them strands at "
-                "least its own traffic. The remaining one, "
-                f"`{_only_partition_only_node(nodes)}`, escapes that reason only "
-                "because it forwards traffic rather than originating it, and is "
-                "critical anyway because losing it partitions the network. A flat "
-                f"count of {criticality.summary.critical_nodes} of "
-                f"{criticality.summary.nodes_evaluated} therefore answers nothing: it "
-                "cannot be lower, whatever the network's actual shape, because it is "
-                "dominated by a rule about who happens to send traffic.\n"
+                f"**{criticality.summary.critical_nodes} of "
+                f"{criticality.summary.nodes_evaluated} nodes and "
+                f"{criticality.summary.critical_links} of "
+                f"{criticality.summary.links_evaluated} links are critical.** An "
+                "element is critical when losing it costs somebody else something: "
+                "it partitions the surviving graph, it strands a demand between two "
+                "nodes that are both still there, or it drives a surviving link over "
+                "capacity.\n"
             ),
             (
-                "The list that does answer the question is the one filtered to the "
-                "two reasons that are about the network's structure rather than "
-                "about who originates traffic: an element that partitions the "
-                "surviving graph, or one that strands a demand between two nodes "
-                "that are both still there.\n"
+                "Traffic that a failed node was itself sending or receiving is "
+                "reported separately, in the endpoint-affected figures, because R8 "
+                "requires that. It does not make the node critical. An earlier "
+                "version of this analysis counted it, which is the literal text of "
+                "R7b, and the result was that every node originating any traffic was "
+                "critical: 37 of 37 here. That number could not be lower whatever the "
+                "network looked like, so it described the demand matrix rather than "
+                "the network, and it was reverted (`docs/DECISIONS.md` D24).\n"
+            ),
+            (
+                "The elements whose loss breaks something structurally, as opposed to "
+                "overloading a link:\n"
             ),
             f"- **Nodes** ({len(structural_nodes)}): {_listed(structural_nodes, limit=None)}",
             f"- **Links** ({len(structural_links)}): {_listed(structural_links, limit=None)}\n",
             (
-                "The two lists differ because `ENDPOINT_DEMANDS_LOST` fires whenever "
-                "the failed element is itself one end of a demand, which on this "
-                "network is almost every node, while `PARTITIONS_NETWORK` and "
-                "`DEMANDS_UNDELIVERABLE` only fire when some *other* pair of "
-                "surviving nodes loses its path. The first measures who talks; the "
-                "second measures what breaks. That is the distinction the slide has "
-                "to carry.\n"
+                "The remaining critical elements are the ones that overload a "
+                "surviving link rather than cutting anything off. They matter for a "
+                "different reason: nothing is unreachable, but a link is carrying "
+                "more than it can.\n"
             ),
         ]
     )
@@ -450,23 +448,6 @@ def _structural_ids(assessments: Sequence[Assessment]) -> tuple[str, ...]:
     return tuple(
         sorted(a.id for a in assessments if structural.intersection(a.reasons))
     )
-
-
-def _only_partition_only_node(nodes: Sequence[Assessment]) -> str:
-    """The one node whose reasons do not include ENDPOINT_DEMANDS_LOST.
-
-    Computed rather than named, so a change in the input data that moves
-    which node this is would change the sentence rather than silently make
-    it wrong.
-    """
-    candidates = [
-        a.id for a in nodes if CriticalityReason.ENDPOINT_DEMANDS_LOST not in a.reasons
-    ]
-    if len(candidates) != 1:
-        raise AssertionError(
-            f"expected exactly one node without ENDPOINT_DEMANDS_LOST, found {candidates}"
-        )
-    return candidates[0]
 
 
 def _listed(ids: tuple[str, ...], *, limit: int | None = _MAX_LISTED_IDS) -> str:
