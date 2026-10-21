@@ -37,7 +37,6 @@ const LABEL_FLIP_MARGIN = 150;
 const REASON_ORDER: readonly CriticalityReason[] = [
   'partitions-network',
   'demands-undeliverable',
-  'endpoint-demands-lost',
   'links-overloaded',
 ];
 

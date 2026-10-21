@@ -4,12 +4,17 @@ D12 and the R7b discussion in ``docs/DECISIONS.md`` settled what "critical"
 means here. R7 names three reasons an element can be critical: it partitions
 the surviving graph (R7a), it leaves a demand between two surviving nodes
 undeliverable (R7b, read on the graph alone), or it overloads a surviving
-link (R7c). The panel then confirmed the literal reading of R7b: a demand
-lost only because its own endpoint failed also counts, which is why
-``docs/api-contract.md`` reports a fourth reason, ``ENDPOINT_DEMANDS_LOST``,
-kept apart from ``DEMANDS_UNDELIVERABLE`` so the genuine structural finding
-is not buried under the 36 of 37 nodes that become "critical" simply by
-originating traffic.
+link (R7c). All three are about somebody else: losing the element has to
+hurt a node that is still there.
+
+A demand lost only because its own endpoint failed does **not** make an
+element critical. It is still reported, in ``FailureImpact`` and as its own
+bucket in a scenario report, because R8 requires that, but it is not a
+reason. The project ran for a while with the opposite reading, which is the
+literal text of R7b: it marked 37 of the real network's 37 nodes critical,
+since 36 of them originate traffic and the thirty-seventh partitions the
+graph, so the flag could not be lower whatever the network looked like. The
+panel reverted it.
 
 **This module owns none of the routing or connectivity logic.** Every number
 below comes from one call to ``analysis.analyse`` per element, failing that
@@ -50,18 +55,16 @@ __all__ = [
 
 
 class CriticalityReason(StrEnum):
-    """Why an element is critical. R7 gives three reasons; we report four.
+    """The three ways losing an element hurts somebody else, per R7.
 
-    See the module docstring and ``docs/api-contract.md`` section 3b for why
-    ``ENDPOINT_DEMANDS_LOST`` exists as its own reason rather than being
-    folded into ``DEMANDS_UNDELIVERABLE``. The wire values match
+    A demand lost because its own endpoint failed is not among them. See the
+    module docstring. The wire values match
     ``netscope.api.schemas.CriticalityReason`` exactly, which
     ``test_criticality.py`` asserts directly so the two cannot drift apart.
     """
 
     PARTITIONS_NETWORK = "partitions-network"
     DEMANDS_UNDELIVERABLE = "demands-undeliverable"
-    ENDPOINT_DEMANDS_LOST = "endpoint-demands-lost"
     LINKS_OVERLOADED = "links-overloaded"
 
 
@@ -185,8 +188,9 @@ def _reasons(result: ScenarioAnalysis) -> tuple[CriticalityReason, ...]:
         fired.add(CriticalityReason.PARTITIONS_NETWORK)
     if result.undeliverable:
         fired.add(CriticalityReason.DEMANDS_UNDELIVERABLE)
-    if result.endpoint_affected:
-        fired.add(CriticalityReason.ENDPOINT_DEMANDS_LOST)
+    # result.endpoint_affected is deliberately not a reason. It is carried in
+    # FailureImpact so R8 can report it separately, but losing your own
+    # traffic is not the network failing somebody else.
     if result.overloaded:
         fired.add(CriticalityReason.LINKS_OVERLOADED)
     # Declaration order, not fire order, so output is stable regardless of

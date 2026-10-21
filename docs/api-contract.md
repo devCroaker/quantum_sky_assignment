@@ -60,23 +60,31 @@ payload, so there is no reason to make the front end ask twice.
 whose failure strands nothing but pushes three other links to 95% is not critical under R7,
 and the operations lead still wants to see it.
 
-### 3b. R7 gives three reasons, we report four
+### 3b. Three reasons, all of them about somebody else
 
-R7b makes an element critical if losing it leaves any demand undeliverable. R8 separately
-requires that demands which start or end at a failed node be reported apart from the rest.
-Whether those endpoint-affected demands count toward the R7b flag is not stated, and it
-changes the answer substantially. The panel confirmed the literal reading: they count.
+An element is critical when losing it costs a node that is still there: it partitions the
+surviving graph, it strands a demand between two survivors, or it drives a surviving link
+over capacity. Those are R7's three reasons and `CriticalityReason` has exactly three members.
 
-The cost of that reading is measured, not guessed. **36 of the 37 nodes become critical**,
-because file A is a full mesh of all 28 cities and R4 gives every site a demand. Only
-`HUB-EAST` escapes, since it forwards traffic but originates none. The `critical` flag
-therefore stops discriminating between a node whose loss splits the network and a node that
-merely sends traffic.
+**Traffic the failed node was itself sending or receiving is reported but is not a reason.**
+It appears in `FailureImpact.endpoint_affected_demands` and `endpoint_affected_units`, and as
+its own bucket in every `ScenarioReport`, because R8 requires it to be reported separately.
+It simply does not set the `critical` flag.
 
-`ENDPOINT_DEMANDS_LOST` exists as its own reason code so that the signal underneath survives.
-A reader who wants R7b as written reads `critical`. A reader who wants the genuine single
-points of failure filters for `PARTITIONS_NETWORK` or `DEMANDS_UNDELIVERABLE`. Neither has to
-recompute anything, and the API does not have to pick a side.
+This was decided the other way first, and the history is worth knowing because the numbers in
+older commits reflect it. R7b says an element is critical if losing it leaves any demand
+undeliverable, and read literally that includes the element's own demands. Under that reading
+**37 of the real network's 37 nodes were critical**, since 36 originate traffic and the
+thirty-seventh partitions the graph. A fourth reason code, `endpoint-demands-lost`, was added
+so a reader could still filter out the noise.
+
+The panel reverted it (`docs/DECISIONS.md` D24). A count that cannot be lower whatever the
+network looks like measures the demand matrix, not the network, and the fourth code was a
+mitigation for a bad metric rather than a good metric in its own right. Criticality now means
+what an operations team was asking: losing this hurts somebody else.
+
+**Measured effect:** critical nodes 37 to 6. Critical links unchanged at 6, because no link
+ever carried the retired reason: losing a link never removes a node.
 
 ### 4. Ranks are computed on the server
 

@@ -183,20 +183,22 @@ class TestContractDefaults:
         assert (parsed.error.file, parsed.error.row) == ("sites.csv", 4)
         assert parsed.error.line is None
 
-    def test_the_four_reason_codes_are_the_only_ones(self) -> None:
-        """R7 names three reasons. We report four, and the split is deliberate.
+    def test_the_three_reason_codes_are_the_only_ones(self) -> None:
+        """R7's three reasons, and nothing else.
 
-        The panel confirmed the literal reading of R7b, under which a demand
-        lost because its own endpoint failed still counts. Keeping that as
-        its own code is what lets a reader filter for the genuine single
-        points of failure without recomputing anything, which matters
-        because the literal reading marks 36 of the real network's 37 nodes
-        critical.
+        A fourth code, endpoint-demands-lost, existed for a while: the project
+        read R7b literally, so a demand lost because its own endpoint failed
+        counted too. That marked 37 of the real network's 37 nodes critical
+        and the panel reverted it (D24). The traffic is still reported, in
+        FailureImpact and as its own bucket in a scenario report, because R8
+        requires that. It is simply not a reason.
+
+        Asserted as an exact list so that reintroducing it, or reordering
+        these, is a deliberate act rather than an accident.
         """
         assert [reason.value for reason in CriticalityReason] == [
             "partitions-network",
             "demands-undeliverable",
-            "endpoint-demands-lost",
             "links-overloaded",
         ]
 
@@ -237,16 +239,21 @@ class TestCriticalityFixture:
         assert kinds.count(ElementKind.NODE) == 7
         assert kinds.count(ElementKind.LINK) == 8
 
-    def test_six_of_seven_nodes_are_critical_and_only_copenhagen_is_not(self) -> None:
-        """The fixture-scale version of what R7b's literal reading costs.
+    def test_three_of_seven_nodes_are_critical(self) -> None:
+        """Only the three whose loss costs somebody else something.
 
-        Copenhagen survives because both demands still have a minimum-hop
-        path without it, and it is an endpoint of neither.
+        Berlin and HUB-EAST partition this network, and Warsaw strands D1
+        between two nodes that both survive. The other four either cost
+        nothing at all, like Copenhagen, which both demands can route around,
+        or cost only their own traffic, which R8 reports and R7 no longer
+        counts.
         """
         report = load("criticality.json", CriticalityResponse)
-        assert report.summary.critical_nodes == 6
-        safe = [a.id for a in report.assessments if a.kind is ElementKind.NODE and not a.critical]
-        assert safe == ["Copenhagen"]
+        assert report.summary.critical_nodes == 3
+        critical = sorted(
+            a.id for a in report.assessments if a.kind is ElementKind.NODE and a.critical
+        )
+        assert critical == ["Berlin", "HUB-EAST", "Warsaw"]
 
     def test_three_of_eight_links_are_critical(self) -> None:
         """The two single-homed access links, plus the only path east.
@@ -266,11 +273,13 @@ class TestCriticalityFixture:
         for assessment in report.assessments:
             assert assessment.critical == bool(assessment.reasons)
 
-    def test_warsaw_is_the_only_element_firing_three_reasons(self) -> None:
-        """It partitions the network, strands D1, and is an endpoint of D2.
+    def test_warsaw_fires_both_structural_reasons_at_once(self) -> None:
+        """It partitions the network and strands D1 between two survivors.
 
-        Worth pinning because it is the one case where all three mechanisms
-        coincide, so a bug that conflates any two of them shows up here.
+        Worth pinning because it is the one case where both structural
+        mechanisms coincide, so a bug that conflates them shows up here. It
+        is also an endpoint of D2, which appears in the impact figures and
+        must not appear among the reasons.
         """
         report = load("criticality.json", CriticalityResponse)
         by_id = {(a.kind, a.id): a for a in report.assessments}
@@ -278,7 +287,6 @@ class TestCriticalityFixture:
         assert set(warsaw.reasons) == {
             CriticalityReason.PARTITIONS_NETWORK,
             CriticalityReason.DEMANDS_UNDELIVERABLE,
-            CriticalityReason.ENDPOINT_DEMANDS_LOST,
         }
         assert warsaw.impact.components == 2
         assert (warsaw.impact.undeliverable_demands, warsaw.impact.undeliverable_units) == (1, 10.0)
@@ -287,21 +295,22 @@ class TestCriticalityFixture:
             warsaw.impact.endpoint_affected_units,
         ) == (1, 100.0)
 
-    def test_the_endpoint_only_cases_are_distinguishable(self) -> None:
-        """Hamburg, DC-NORTH and OPS-EAST-1 are critical for one reason only.
+    def test_losing_only_your_own_traffic_is_reported_but_is_not_a_reason(self) -> None:
+        """Hamburg, DC-NORTH and OPS-EAST-1 lose traffic and are not critical.
 
-        None of them partitions anything or strands a demand between two
-        survivors. Under the stricter reading of R7b they would not be
-        critical at all, and this test is what proves the payload still
-        carries enough to tell the difference.
+        Each of the three strands a demand when it fails, but only its own,
+        so nothing that survives is worse off. They are the cases the revert
+        in D24 turned on: the units are still reported in the impact figures,
+        which R8 requires, and the reasons list is empty.
         """
         report = load("criticality.json", CriticalityResponse)
-        endpoint_only = sorted(
-            a.id
-            for a in report.assessments
-            if a.reasons == (CriticalityReason.ENDPOINT_DEMANDS_LOST,)
-        )
-        assert endpoint_only == ["DC-NORTH", "Hamburg", "OPS-EAST-1"]
+        by_id = {(a.kind, a.id): a for a in report.assessments}
+        for node_id in ("DC-NORTH", "Hamburg", "OPS-EAST-1"):
+            assessment = by_id[(ElementKind.NODE, node_id)]
+            assert assessment.reasons == (), node_id
+            assert not assessment.critical, node_id
+            assert assessment.impact.endpoint_affected_demands == 1, node_id
+            assert assessment.impact.endpoint_affected_units > 0.0, node_id
 
     def test_no_fixture_scenario_overloads_a_link(self) -> None:
         """Stated so its absence is not mistaken for a result.

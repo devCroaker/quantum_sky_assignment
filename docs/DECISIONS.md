@@ -122,6 +122,8 @@ natural place to name the requirement ids a task satisfies.
 **Cost accepted.** Twenty-two pull requests to review.
 
 ## D12. R7a, does isolating a leaf site count as splitting the network?
+**Partly superseded: see D24.** The R7a answer below still stands. The R7b reading recorded
+in the "Open questions" resolution and in the consequence paragraph was reverted.
 **Options.** Judge connectivity on the whole remaining graph, so stranding a single-homed
 site is a partition, or count only partitions of the backbone and report stranded sites
 under R7b instead.
@@ -345,6 +347,48 @@ eight tests, including both amended ones.
 predate this rule and are not produced by `build_network`. Nothing is broken, because the
 fixture is a cut-down network and not a snapshot of the real one, but P13 should not expect
 the two to agree when it wires the real loaders to the API.
+
+## D24. R7b reverted: losing only your own traffic is not critical
+**Supersedes the R7b half of D12, and retires the fourth reason code added in P15b.**
+**Decided by.** Panel.
+
+**What changed.** An element is critical only when losing it costs somebody else something:
+it partitions the surviving graph, it strands a demand between two nodes that both survive,
+or it drives a surviving link over capacity. A demand lost because its own endpoint failed no
+longer counts, and `endpoint-demands-lost` is gone from `CriticalityReason` on both sides of
+the wire.
+
+**Why the original reading was tried.** It is the literal text of R7b, which says an element
+is critical if losing it leaves any demand undeliverable, without excepting the demands the
+element itself originates. The cost was measured before the decision rather than discovered
+after it, and the panel chose the literal reading knowing it.
+
+**Why it was reverted.** The cost turned out to be the whole answer. All 37 of the 37 nodes
+were critical: 36 originate traffic and the thirty-seventh partitions the graph. That count
+cannot be lower whatever the network looks like, because it is a fact about the demand matrix
+and not about the topology. A metric that cannot vary is not a measurement. The deck slide
+built on it had to spend its space explaining why its own headline number should be ignored,
+which is the clearest possible sign the number was wrong.
+
+**What this costs.** Nothing in the data. R8 still requires demands lost to a failed endpoint
+to be reported separately, and they still are, in `FailureImpact.endpoint_affected_demands`
+and `endpoint_affected_units` and as their own bucket in every scenario report. The figures
+are unchanged; only their effect on the `critical` flag is.
+
+**Measured consequence.** Critical nodes go from 37 to **6**: `Athens`, `Dublin` and
+`HUB-EAST` partition the network, `Warsaw` strands a demand between survivors, and `Berlin`
+and `Hamburg` overload a surviving link. Critical links are **unchanged at 6**, because no
+link ever carried the retired reason: losing a link never removes a node.
+
+**Consequence for the view.** The Critical panel's reason filter was a way to hide 31 nodes
+of noise and is now a way to narrow. Every reason is selected by default, because every
+remaining reason describes harm to somebody else.
+
+**Worth recording as a process point.** The fourth reason code was the right response to the
+decision as it stood: it preserved the discriminating signal underneath a flag that had
+stopped discriminating. It was a mitigation of a bad metric rather than a good metric, and
+removing the cause removed the need for it. Keeping both would have left two ways to ask the
+same question.
 
 ---
 

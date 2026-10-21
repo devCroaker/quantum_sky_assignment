@@ -35,7 +35,7 @@ function renderMap(): ReturnType<typeof render> {
  * squinting at a greyscale screenshot) prove the encoding is really there.
  */
 describe('MapView critical and top-five overlays (D21)', () => {
-  it('matches the fixture-derived counts: 6 of 7 nodes and 3 of 8 links critical', () => {
+  it('matches the fixture-derived counts: 3 of 7 nodes and 3 of 8 links critical', () => {
     // Derived from the fixture's own summary, never hardcoded independently of it, per
     // CLAUDE.md's "never invent a number": this is the number the server computed, and the
     // test holds the view to reproducing it, not to agreeing with itself.
@@ -47,7 +47,7 @@ describe('MapView critical and top-five overlays (D21)', () => {
     ).length;
     expect(criticalNodeCount).toBe(criticality.summary.critical_nodes);
     expect(criticalLinkCount).toBe(criticality.summary.critical_links);
-    expect(criticalNodeCount).toBe(6);
+    expect(criticalNodeCount).toBe(3);
     expect(criticalLinkCount).toBe(3);
   });
 

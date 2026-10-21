@@ -84,8 +84,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pydantic import BaseModel
-
 from netscope.api.schemas import (
     Assessment,
     CriticalityReason,
@@ -106,6 +104,7 @@ from netscope.api.schemas import (
     StrandedDemand,
 )
 from netscope.models import LinkKind, NodeKind
+from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "contracts" / "fixtures"
@@ -273,9 +272,10 @@ def berlin_down() -> ScenarioReport:
 #: reasons, components, undeliverable demands and units, endpoint-affected
 #: demands and units, overloaded links, highest surviving utilization.
 #:
-#: Six of the seven nodes are critical and only Copenhagen is not, which is
-#: the fixture-scale version of what R7b's literal reading does to the real
-#: network. Three of the eight links are critical.
+#: Three of the seven nodes are critical, Berlin, HUB-EAST and Warsaw, and
+#: three of the eight links. The endpoint-affected columns are still filled in
+#: for every element, because R8 reports that separately; it is simply not a
+#: reason for being critical.
 CRITICALITY: dict[
     tuple[str, str], tuple[tuple[str, ...], int, int, float, int, float, int, float]
 ] = {
@@ -290,12 +290,14 @@ CRITICALITY: dict[
         0,
         0.0,
     ),
-    # The only element of either kind that is not critical. Losing it leaves
-    # both demands deliverable over their remaining minimum-hop paths.
+    # Not critical: losing it leaves both demands deliverable over their
+    # remaining minimum-hop paths.
     ("node", "Copenhagen"): ((), 1, 0, 0.0, 0, 0.0, 0, 0.25),
-    # Critical only because it is an endpoint of D1, per R7b as written.
+    # Not critical. Losing it does strand D1, but only because D1 ends here,
+    # and losing your own traffic is not the network failing somebody else.
+    # The units are still reported, in the endpoint-affected columns.
     ("node", "DC-NORTH"): (
-        ("endpoint-demands-lost",),
+        (),
         1,
         0,
         0.0,
@@ -314,9 +316,9 @@ CRITICALITY: dict[
         0,
         100.0 / 550.0,
     ),
-    ("node", "Hamburg"): (("endpoint-demands-lost",), 1, 0, 0.0, 1, 100.0, 0, 0.25),
+    ("node", "Hamburg"): ((), 1, 0, 0.0, 1, 100.0, 0, 0.25),
     ("node", "OPS-EAST-1"): (
-        ("endpoint-demands-lost",),
+        (),
         1,
         0,
         0.0,
@@ -325,11 +327,14 @@ CRITICALITY: dict[
         0,
         100.0 / 550.0,
     ),
-    # The only element that fires three reasons at once: it partitions the
-    # network, strands D1 between two survivors, and is itself an endpoint
-    # of D2.
+    # Fires both structural reasons at once: it partitions the network and
+    # strands D1 between two survivors. It is also an endpoint of D2, which
+    # shows up in the endpoint-affected columns but is not a reason.
     ("node", "Warsaw"): (
-        ("partitions-network", "demands-undeliverable", "endpoint-demands-lost"),
+        (
+            "partitions-network",
+            "demands-undeliverable",
+        ),
         2,
         1,
         10.0,

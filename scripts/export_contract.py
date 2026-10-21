@@ -16,8 +16,6 @@ import json
 import sys
 from pathlib import Path
 
-from pydantic.json_schema import models_json_schema
-
 from netscope.api.schemas import (
     CriticalityResponse,
     ErrorResponse,
@@ -25,6 +23,7 @@ from netscope.api.schemas import (
     ScenarioReport,
     ScenarioRequest,
 )
+from pydantic.json_schema import models_json_schema
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "contracts" / "schema.json"

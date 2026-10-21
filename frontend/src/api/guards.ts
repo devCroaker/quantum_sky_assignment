@@ -155,7 +155,6 @@ const ELEMENT_KINDS: readonly ElementKind[] = ['node', 'link'];
 const CRITICALITY_REASONS: readonly CriticalityReason[] = [
   'partitions-network',
   'demands-undeliverable',
-  'endpoint-demands-lost',
   'links-overloaded',
 ];
 

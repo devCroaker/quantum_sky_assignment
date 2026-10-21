@@ -163,7 +163,7 @@
       "reasons": []
     },
     {
-      "critical": true,
+      "critical": false,
       "id": "DC-NORTH",
       "impact": {
         "components": 1,
@@ -175,9 +175,7 @@
         "undeliverable_units": 0.0
       },
       "kind": "node",
-      "reasons": [
-        "endpoint-demands-lost"
-      ]
+      "reasons": []
     },
     {
       "critical": true,
@@ -198,7 +196,7 @@
       ]
     },
     {
-      "critical": true,
+      "critical": false,
       "id": "Hamburg",
       "impact": {
         "components": 1,
@@ -210,12 +208,10 @@
         "undeliverable_units": 0.0
       },
       "kind": "node",
-      "reasons": [
-        "endpoint-demands-lost"
-      ]
+      "reasons": []
     },
     {
-      "critical": true,
+      "critical": false,
       "id": "OPS-EAST-1",
       "impact": {
         "components": 1,
@@ -227,9 +223,7 @@
         "undeliverable_units": 0.0
       },
       "kind": "node",
-      "reasons": [
-        "endpoint-demands-lost"
-      ]
+      "reasons": []
     },
     {
       "critical": true,
@@ -246,14 +240,13 @@
       "kind": "node",
       "reasons": [
         "partitions-network",
-        "demands-undeliverable",
-        "endpoint-demands-lost"
+        "demands-undeliverable"
       ]
     }
   ],
   "summary": {
     "critical_links": 3,
-    "critical_nodes": 6,
+    "critical_nodes": 3,
     "links_evaluated": 8,
     "nodes_evaluated": 7
   }
