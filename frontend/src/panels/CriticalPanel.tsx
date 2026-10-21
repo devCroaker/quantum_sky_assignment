@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import { useMemo, useState } from 'react';
 
 import type { Assessment, CriticalityReason, CriticalityResponse } from '../api/types';
+import { useFailureToggle } from '../state/failureContext';
 import { useHighlightHandlers } from '../state/selectionContext';
 import {
   countsByReason,
@@ -15,24 +16,36 @@ import { PanelSection } from './PanelSection';
 function Row({ assessment }: { assessment: Assessment }): JSX.Element {
   const { highlighted, onPointerEnter, onPointerLeave, onFocus, onBlur, onSelect } =
     useHighlightHandlers({ kind: assessment.kind, id: assessment.id });
+  // A native button turns Enter and Space into a click, so the click handler alone covers
+  // the keyboard as well as the pointer (R11).
+  const { failed, toggle } = useFailureToggle({
+    kind: assessment.kind,
+    id: assessment.id,
+  });
   const reasons = assessment.reasons ?? [];
   return (
     <li>
       <button
         type="button"
-        className={`critical-row${highlighted ? ' is-highlighted' : ''}`}
+        className={`critical-row${highlighted ? ' is-highlighted' : ''}${failed ? ' is-failed' : ''}`}
         data-critical-reasons={reasons.join(' ')}
+        data-failed={failed ? 'true' : undefined}
+        aria-pressed={failed}
         onMouseEnter={onPointerEnter}
         onMouseLeave={onPointerLeave}
         onFocus={onFocus}
         onBlur={onBlur}
-        onClick={onSelect}
+        onClick={() => {
+          onSelect();
+          toggle();
+        }}
       >
         <span className="critical-row-id">{assessment.id}</span>
         <span className="critical-row-kind">{assessment.kind}</span>
         <span className="critical-row-reasons">
           {reasons.map((reason) => REASON_LABEL[reason]).join('; ')}
         </span>
+        {failed ? <span className="failed-tag">Failed: activate to restore</span> : null}
       </button>
     </li>
   );

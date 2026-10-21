@@ -42,6 +42,15 @@ export function Legend(): JSX.Element {
       </div>
       <div className="map-legend-item">
         <svg className="map-legend-glyph" viewBox="0 0 28 28" aria-hidden="true">
+          <circle r={7} className="map-legend-node node-body-failed" cx={14} cy={14} />
+          <g className="failed-marker" transform="translate(14,14)">
+            <path d="M-5,-5 L5,5 M5,-5 L-5,5" />
+          </g>
+        </svg>
+        <span>Failed: faded and crossed out, restored from the Impact panel</span>
+      </div>
+      <div className="map-legend-item">
+        <svg className="map-legend-glyph" viewBox="0 0 28 28" aria-hidden="true">
           <line
             className="map-legend-link link-top-utilized"
             x1={2}

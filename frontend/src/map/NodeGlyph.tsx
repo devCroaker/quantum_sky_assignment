@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 
 import type { CriticalityReason, NodeKind } from '../api/types';
+import { useFailureToggle } from '../state/failureContext';
 import { useHighlightHandlers } from '../state/selectionContext';
 import { glyphShapeFor, kindLabelFor } from './nodeKind';
 
@@ -10,6 +11,10 @@ const GLYPH_SIZE = 7;
 /** Radius of the dashed ring drawn around a critical node (D21). Large enough to clear
  * every glyph shape, including the diamond, which is the widest at this size. */
 const CRITICAL_RING_RADIUS = GLYPH_SIZE + 6;
+
+/** Half-width of the cross drawn over a failed node. Inside the glyph, not around it, so a
+ * failed node is never mistaken for a critical one, whose marks sit outside the shape. */
+const FAILED_CROSS_HALF = GLYPH_SIZE * 0.7;
 
 /**
  * A small warning triangle, offset to the glyph's upper right, so a critical node reads as
@@ -28,6 +33,24 @@ function WarningMarker(): JSX.Element {
       <text className="critical-marker-bang" y={2.4}>
         !
       </text>
+    </g>
+  );
+}
+
+/**
+ * A cross over a failed node. A failed node is faded and crossed out, which shares no shape
+ * with the dashed ring and the warning triangle that mark a critical one, so the two cannot
+ * be confused in greyscale (D21).
+ */
+export function FailedCross({
+  half = FAILED_CROSS_HALF,
+}: {
+  half?: number;
+}): JSX.Element {
+  const d = `M${String(-half)},${String(-half)} L${String(half)},${String(half)} M${String(half)},${String(-half)} L${String(-half)},${String(half)}`;
+  return (
+    <g className="failed-marker" aria-hidden="true">
+      <path d={d} />
     </g>
   );
 }
@@ -71,6 +94,9 @@ function ShapePath({ kind }: { kind: NodeKind }): JSX.Element {
 /**
  * One node glyph, shape keyed by `kind` (R9, D21). `x`/`y` are already in the zoomed SVG
  * user space; the caller applies the pan/zoom transform to the enclosing `<g>`.
+ *
+ * Clicking, or pressing Enter or Space on it, fails or restores the node (R11). A failed
+ * node carries `data-failed="true"`, fades its shape and is crossed out.
  */
 export function NodeGlyph({
   id,
@@ -106,34 +132,48 @@ export function NodeGlyph({
 }): JSX.Element {
   const { highlighted, onPointerEnter, onPointerLeave, onFocus, onBlur, onSelect } =
     useHighlightHandlers({ kind: 'node', id });
+  const { failed, toggle, onKeyDown } = useFailureToggle({ kind: 'node', id });
   const classes = ['node-glyph'];
   if (critical) classes.push('node-glyph-critical');
+  if (failed) classes.push('node-glyph-failed');
   if (highlighted) classes.push('is-highlighted');
+  const criticalText = critical ? `critical: ${reasons.join(', ')}` : '';
+  const failedText = failed ? 'failed' : '';
+  const stateText = [criticalText, failedText].filter((part) => part !== '').join(', ');
   return (
     <g
       className={classes.join(' ')}
       data-node-id={id}
       data-shape={glyphShapeFor(kind)}
       data-critical-reasons={critical ? reasons.join(' ') : undefined}
+      data-failed={failed ? 'true' : undefined}
       transform={`translate(${String(x)},${String(y)})`}
       tabIndex={0}
       role="button"
+      aria-pressed={failed}
       aria-label={
-        critical
-          ? `${id}, ${kindLabelFor(kind)}, critical: ${reasons.join(', ')}`
-          : `${id}, ${kindLabelFor(kind)}`
+        stateText === ''
+          ? `${id}, ${kindLabelFor(kind)}`
+          : `${id}, ${kindLabelFor(kind)}, ${stateText}`
       }
       onMouseEnter={onPointerEnter}
       onMouseLeave={onPointerLeave}
       onFocus={onFocus}
       onBlur={onBlur}
-      onClick={onSelect}
+      onClick={() => {
+        onSelect();
+        toggle();
+      }}
+      onKeyDown={onKeyDown}
     >
       <title>
-        {id} ({kindLabelFor(kind)})
+        {id} ({kindLabelFor(kind)}){failed ? ', failed' : ''}
       </title>
       {critical ? <circle className="critical-ring" r={CRITICAL_RING_RADIUS} /> : null}
-      <ShapePath kind={kind} />
+      <g className={failed ? 'node-body node-body-failed' : 'node-body'}>
+        <ShapePath kind={kind} />
+      </g>
+      {failed ? <FailedCross /> : null}
       {critical ? <WarningMarker /> : null}
       {label ? (
         <text

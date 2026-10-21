@@ -10,13 +10,14 @@ import type {
   NodeWire,
   RankedLink,
 } from '../api/types';
+import { useFailureToggle, useFailures } from '../state/failureContext';
 import { useHighlightHandlers } from '../state/selectionContext';
 import { ClusterPopover } from './ClusterPopover';
 import type { Cluster, ScreenPoint } from './clustering';
 import { CLUSTER_THRESHOLD_PX, clusterByProximity } from './clustering';
 import { Legend } from './Legend';
 import { landFeatures } from './landOutline';
-import { NodeGlyph } from './NodeGlyph';
+import { FailedCross, NodeGlyph } from './NodeGlyph';
 import { createProjection, MAP_HEIGHT, MAP_WIDTH } from './projection';
 
 /**
@@ -39,6 +40,9 @@ const REASON_ORDER: readonly CriticalityReason[] = [
   'endpoint-demands-lost',
   'links-overloaded',
 ];
+
+/** Half-width of the cross on a failed link, in map units. Small, so it reads on a thin line. */
+const LINK_CROSS_HALF = 4;
 
 /** Clears the cluster marker's own ring, which is drawn at radius 11. */
 const CLUSTER_CRITICAL_RING_RADIUS = 15;
@@ -117,15 +121,22 @@ function LinkLine({
   reasons: readonly CriticalityReason[];
   rank: number | undefined;
 }): JSX.Element {
-  const { highlighted, onPointerEnter, onPointerLeave, onSelect } = useHighlightHandlers({
-    kind: 'link',
-    id,
-  });
+  const { highlighted, onPointerEnter, onPointerLeave, onFocus, onBlur, onSelect } =
+    useHighlightHandlers({ kind: 'link', id });
+  const { failed, toggle, onKeyDown } = useFailureToggle({ kind: 'link', id });
   const classes = [`link`, `link-${kind}`];
   if (critical) classes.push('link-critical');
   if (rank !== undefined) classes.push('link-top-utilized');
+  if (failed) classes.push('link-failed');
   if (highlighted) classes.push('is-highlighted');
   const midpoint = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+  // The cross sits a third of the way along the line, clear of the rank badge at the
+  // midpoint, so a link that is both ranked and failed shows both marks.
+  const crossAt = { x: from.x + (to.x - from.x) / 3, y: from.y + (to.y - from.y) / 3 };
+  const stateWords = [
+    critical ? `critical: ${reasons.join(', ')}` : '',
+    failed ? 'failed' : '',
+  ].filter((part) => part !== '');
   return (
     <>
       <line
@@ -133,20 +144,37 @@ function LinkLine({
         data-link-id={id}
         data-critical-reasons={critical ? reasons.join(' ') : undefined}
         data-rank={rank}
+        data-failed={failed ? 'true' : undefined}
         x1={from.x}
         y1={from.y}
         x2={to.x}
         y2={to.y}
+        tabIndex={0}
+        role="button"
+        aria-pressed={failed}
+        aria-label={[`Link ${id}`, ...stateWords].join(', ')}
         onMouseEnter={onPointerEnter}
         onMouseLeave={onPointerLeave}
-        onClick={onSelect}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        onClick={() => {
+          onSelect();
+          toggle();
+        }}
+        onKeyDown={onKeyDown}
       >
         <title>
           {id}
           {critical ? ` (critical: ${reasons.join(', ')})` : ''}
           {rank !== undefined ? ` (rank ${String(rank)} of 5 most utilized)` : ''}
+          {failed ? ' (failed)' : ''}
         </title>
       </line>
+      {failed ? (
+        <g transform={`translate(${String(crossAt.x)},${String(crossAt.y)})`}>
+          <FailedCross half={LINK_CROSS_HALF} />
+        </g>
+      ) : null}
       {rank !== undefined ? (
         <g
           className="rank-badge"
@@ -313,6 +341,8 @@ export function MapView({
     [projected],
   );
 
+  const { toggle: toggleFailure, isFailed } = useFailures();
+
   const openCluster = clusters.find(
     (cluster) => clusterKey(cluster) === openClusterKey && cluster.members.length > 1,
   );
@@ -399,13 +429,30 @@ export function MapView({
                 const criticalMemberCount = memberReasons.filter(
                   (reasons) => reasons.length > 0,
                 ).length;
+                // A cluster absorbs its members' glyphs, so without this a
+                // failed node inside one simply stops looking failed. On the
+                // real network seven of the 37 nodes sit in a cluster at the
+                // default view, so a reader could fail a node from the popover
+                // and watch the map not change, which is exactly the feedback
+                // R11 exists to give.
+                const failedMemberCount = cluster.members.filter((member) =>
+                  isFailed({ kind: 'node', id: member.id }),
+                ).length;
                 return (
                   <g
                     key={key}
                     ref={(el) => {
                       markerRefs.current.set(key, el);
                     }}
-                    className="cluster-marker"
+                    className={
+                      failedMemberCount > 0
+                        ? 'cluster-marker cluster-marker-failed'
+                        : 'cluster-marker'
+                    }
+                    data-failed={failedMemberCount > 0 ? 'true' : undefined}
+                    data-failed-members={
+                      failedMemberCount > 0 ? String(failedMemberCount) : undefined
+                    }
                     data-critical-reasons={
                       clusterReasons.length > 0 ? clusterReasons.join(' ') : undefined
                     }
@@ -417,7 +464,12 @@ export function MapView({
                     role="button"
                     aria-haspopup="menu"
                     aria-expanded={openClusterKey === key}
-                    aria-label={`${String(cluster.members.length)} nodes at this position`}
+                    aria-label={
+                      failedMemberCount > 0
+                        ? `${String(cluster.members.length)} nodes at this position, ` +
+                          `${String(failedMemberCount)} failed`
+                        : `${String(cluster.members.length)} nodes at this position`
+                    }
                     onMouseEnter={(event) => {
                       openNow(key, event.currentTarget);
                     }}
@@ -457,6 +509,12 @@ export function MapView({
                     {clusterReasons.length > 0 ? <ClusterWarningMarker /> : null}
                     <circle className="cluster-marker-ring" r={11} />
                     {/*
+                      The same cross a failed node carries, so the encoding is
+                      one thing a reader learns once. Drawn at the cluster
+                      ring's radius rather than the glyph's.
+                    */}
+                    {failedMemberCount > 0 ? <FailedCross half={9} /> : null}
+                    {/*
                       The count is text, which is what makes this marker legible without
                       colour (D21): a reader sees "3" before ever hovering, not a dot that
                       only colour would have distinguished from a single node.
@@ -480,10 +538,8 @@ export function MapView({
             }}
             onMouseEnter={cancelClose}
             onMouseLeave={scheduleClose}
-            onSelectNode={() => {
-              // P18 wires this to failing/selecting the node. No behaviour is asked of
-              // R9 beyond the popover existing and each entry being a real, clickable
-              // button, so this is deliberately a no-op for now.
+            onSelectNode={(id) => {
+              toggleFailure({ kind: 'node', id });
             }}
             onRequestReturnFocus={() => {
               const key = openClusterKey;

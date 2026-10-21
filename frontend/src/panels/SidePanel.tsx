@@ -12,18 +12,23 @@ import { TopUtilizedPanel } from './TopUtilizedPanel';
  * utilized, Impact. Nothing collapses or appears on selection, so the operations lead
  * reads the same three answers in the same spots whether or not anything is down.
  *
- * Critical and Top five utilized need data that is not ready on the very first render
- * (the criticality and baseline requests are still in flight), so both are optional here;
- * each panel shows its own placeholder until App has them, exactly as it did before P17.
+ * Critical depends only on the criticality assessment, which is for the network as built.
+ * Top five utilized and Impact follow `report`, the latest scenario answer, so they move
+ * when an element is failed or restored. Each shows its own placeholder until its data
+ * arrives.
  */
 export function SidePanel({
   network,
   criticality,
-  baseline,
+  report,
+  scenarioPending,
+  scenarioError,
 }: {
   network: NetworkResponse | null;
   criticality: CriticalityResponse | null;
-  baseline: ScenarioReport | null;
+  report: ScenarioReport | null;
+  scenarioPending: boolean;
+  scenarioError: string | null;
 }): JSX.Element {
   return (
     <aside className="side-panel" aria-label="Analysis">
@@ -37,7 +42,7 @@ export function SidePanel({
       ) : (
         <CriticalPanel criticality={criticality} />
       )}
-      {baseline === null || network === null ? (
+      {report === null || network === null ? (
         <section className="panel-section" aria-labelledby="top-utilized-heading">
           <h2 id="top-utilized-heading" className="panel-section-title">
             Top five utilized
@@ -45,9 +50,9 @@ export function SidePanel({
           <p className="panel-empty">Loading the baseline scenario.</p>
         </section>
       ) : (
-        <TopUtilizedPanel report={baseline} network={network} />
+        <TopUtilizedPanel report={report} network={network} />
       )}
-      <ImpactPanel />
+      <ImpactPanel report={report} pending={scenarioPending} error={scenarioError} />
     </aside>
   );
 }
