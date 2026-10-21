@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pytest
 
-from netscope.criticality import CriticalityReason, ElementKind, sweep
+from netscope.criticality import CriticalityReason, CriticalitySweep, ElementKind, sweep
 from netscope.loaders.merge import build_network
 from netscope.loaders.sites_csv import load_sites
 from netscope.loaders.sndlib_xml import load_backbone
@@ -45,6 +45,22 @@ FIXTURES = ROOT / "contracts" / "fixtures"
 @pytest.fixture(scope="module")
 def real_network() -> Network:
     return build_network(load_backbone(SNDLIB), load_sites(SITES), sites_file=str(SITES))
+
+
+@pytest.fixture(scope="module")
+def real_sweep(real_network: Network) -> CriticalitySweep:
+    """The sweep over the real network, computed once for this module.
+
+    Sweeping 92 single failures costs about half a second. Every test here
+    used to call ``sweep`` itself, so the module spent 7.5 of the suite's
+    13.5 seconds recomputing an answer that cannot change: the sweep is a
+    pure function of an immutable network, which the determinism test below
+    asserts outright.
+
+    The determinism test is the one exception and deliberately does not use
+    this fixture, because sharing one result would make it vacuous.
+    """
+    return sweep(real_network)
 
 
 # ---------------------------------------------------------------------------
@@ -189,12 +205,12 @@ class TestFixtureAsOracle:
 class TestRealNetwork:
     """Figures measured directly by running this sweep against ``data/``."""
 
-    def test_counts_evaluated(self, real_network: Network) -> None:
-        result = sweep(real_network)
+    def test_counts_evaluated(self, real_sweep: CriticalitySweep) -> None:
+        result = real_sweep
         assert result.summary.nodes_evaluated == 37
         assert result.summary.links_evaluated == 55
 
-    def test_six_of_thirty_seven_nodes_are_critical(self, real_network: Network) -> None:
+    def test_six_of_thirty_seven_nodes_are_critical(self, real_sweep: CriticalitySweep) -> None:
         """Only an element whose loss hurts somebody else is critical.
 
         Four nodes break something structurally: `Athens`, `Dublin` and
@@ -216,7 +232,7 @@ class TestRealNetwork:
         that distinction on `Hamburg`, which is critical for overloading a
         link while also losing 100 units of its own traffic.
         """
-        result = sweep(real_network)
+        result = real_sweep
         nodes = [a for a in result.assessments if a.kind is ElementKind.NODE]
         assert len(nodes) == 37
         assert result.summary.critical_nodes == 6
@@ -230,7 +246,7 @@ class TestRealNetwork:
         }
 
     def test_losing_only_your_own_traffic_is_reported_but_is_not_a_reason(
-        self, real_network: Network
+        self, real_sweep: CriticalitySweep
     ) -> None:
         """The distinction the revert turned on, pinned on two real nodes.
 
@@ -242,7 +258,7 @@ class TestRealNetwork:
         for overloading a surviving link. Its reasons must not mention the
         traffic it originates.
         """
-        result = sweep(real_network)
+        result = real_sweep
         by_id = {a.id: a for a in result.assessments if a.kind is ElementKind.NODE}
 
         amsterdam = by_id["Amsterdam"]
@@ -256,8 +272,8 @@ class TestRealNetwork:
         assert hamburg.reasons == (CriticalityReason.LINKS_OVERLOADED,)
         assert hamburg.impact.endpoint_affected_units > 0.0
 
-    def test_critical_links(self, real_network: Network) -> None:
-        result = sweep(real_network)
+    def test_critical_links(self, real_sweep: CriticalitySweep) -> None:
+        result = real_sweep
         links = [a for a in result.assessments if a.kind is ElementKind.LINK]
         assert len(links) == 55
         assert result.summary.critical_links == 6
@@ -271,8 +287,8 @@ class TestRealNetwork:
             "L26",
         }
 
-    def test_reasons_by_kind_and_reason_for_nodes(self, real_network: Network) -> None:
-        result = sweep(real_network)
+    def test_reasons_by_kind_and_reason_for_nodes(self, real_sweep: CriticalitySweep) -> None:
+        result = real_sweep
         nodes = [a for a in result.assessments if a.kind is ElementKind.NODE]
 
         def ids_with(reason: CriticalityReason) -> set[str]:
@@ -287,8 +303,8 @@ class TestRealNetwork:
         }
         assert ids_with(CriticalityReason.LINKS_OVERLOADED) == {"Berlin", "Hamburg"}
 
-    def test_reasons_by_kind_and_reason_for_links(self, real_network: Network) -> None:
-        result = sweep(real_network)
+    def test_reasons_by_kind_and_reason_for_links(self, real_sweep: CriticalitySweep) -> None:
+        result = real_sweep
         links = [a for a in result.assessments if a.kind is ElementKind.LINK]
 
         def ids_with(reason: CriticalityReason) -> set[str]:
@@ -307,7 +323,9 @@ class TestRealNetwork:
         }
         assert ids_with(CriticalityReason.LINKS_OVERLOADED) == {"L12", "L26"}
 
-    def test_no_link_ever_loses_a_demand_to_its_own_endpoint(self, real_network: Network) -> None:
+    def test_no_link_ever_loses_a_demand_to_its_own_endpoint(
+        self, real_sweep: CriticalitySweep
+    ) -> None:
         """Losing a link never removes a node, so no demand can lose an endpoint.
 
         Asserted across all 55 links, not spot-checked, because this is a
@@ -316,13 +334,15 @@ class TestRealNetwork:
         figures rather than on the reasons, because losing your own traffic is
         no longer a reason for being critical.
         """
-        result = sweep(real_network)
+        result = real_sweep
         links = [a for a in result.assessments if a.kind is ElementKind.LINK]
         assert len(links) == 55
         assert all(a.impact.endpoint_affected_demands == 0 for a in links)
         assert all(a.impact.endpoint_affected_units == 0.0 for a in links)
 
-    def test_warsaw_strands_demands_without_partitioning(self, real_network: Network) -> None:
+    def test_warsaw_strands_demands_without_partitioning(
+        self, real_sweep: CriticalitySweep
+    ) -> None:
         """Warsaw is the D12 finding: it strands two demands but splits nothing.
 
         OPS-EAST-2 attaches to both HUB-EAST and Budapest, which accidentally
@@ -332,7 +352,7 @@ class TestRealNetwork:
         legal path. A connectivity check alone would call Warsaw safe; R7b
         does not.
         """
-        result = sweep(real_network)
+        result = real_sweep
         warsaw = next(
             a for a in result.assessments if a.kind is ElementKind.NODE and a.id == "Warsaw"
         )
@@ -346,15 +366,15 @@ class TestRealNetwork:
 
 
 class TestSweepProperties:
-    def test_critical_flag_matches_non_empty_reasons(self, real_network: Network) -> None:
-        result = sweep(real_network)
+    def test_critical_flag_matches_non_empty_reasons(self, real_sweep: CriticalitySweep) -> None:
+        result = real_sweep
         assert len(result.assessments) == 92
         for assessment in result.assessments:
             assert assessment.critical == bool(assessment.reasons)
 
-    def test_reasons_appear_in_declaration_order(self, real_network: Network) -> None:
+    def test_reasons_appear_in_declaration_order(self, real_sweep: CriticalitySweep) -> None:
         declaration_order = list(CriticalityReason)
-        result = sweep(real_network)
+        result = real_sweep
         for assessment in result.assessments:
             positions = [declaration_order.index(r) for r in assessment.reasons]
             assert positions == sorted(positions), assessment
@@ -365,13 +385,13 @@ class TestSweepProperties:
         assert first.assessments == second.assessments
         assert first.summary == second.summary
 
-    def test_assessments_are_sorted_by_kind_then_id(self, real_network: Network) -> None:
-        result = sweep(real_network)
+    def test_assessments_are_sorted_by_kind_then_id(self, real_sweep: CriticalitySweep) -> None:
+        result = real_sweep
         keys = [(a.kind.value, a.id) for a in result.assessments]
         assert keys == sorted(keys)
 
-    def test_summary_counts_agree_with_the_assessments(self, real_network: Network) -> None:
-        result = sweep(real_network)
+    def test_summary_counts_agree_with_the_assessments(self, real_sweep: CriticalitySweep) -> None:
+        result = real_sweep
         nodes = [a for a in result.assessments if a.kind is ElementKind.NODE]
         links = [a for a in result.assessments if a.kind is ElementKind.LINK]
         assert result.summary.nodes_evaluated == len(nodes)
