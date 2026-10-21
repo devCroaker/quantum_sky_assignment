@@ -22,6 +22,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
+from math import isfinite
 
 __all__ = [
     "Coordinates",
@@ -138,7 +139,14 @@ class Link:
     kind: LinkKind
 
     def __post_init__(self) -> None:
-        if self.capacity <= 0:
+        # isfinite, not a bare > 0 comparison: float("nan") <= 0 is False, so a
+        # NaN capacity would otherwise pass silently and then poison every
+        # utilization computed from it. An independent review traced this to
+        # NETSCOPE_BACKBONE_CAPACITY, which goes through float() with no
+        # isfinite check of its own before it ever reaches here; this is the
+        # one place every capacity value passes through regardless of source,
+        # so it is the right place to close the gap.
+        if not isfinite(self.capacity) or self.capacity <= 0:
             raise ValueError(f"link {self.id!r} needs a positive capacity, got {self.capacity}")
 
 
@@ -149,7 +157,9 @@ class Demand:
     volume: float
 
     def __post_init__(self) -> None:
-        if self.volume <= 0:
+        # Same reasoning as Link.capacity above: isfinite first, so NaN cannot
+        # slip past a bare > 0 comparison.
+        if not isfinite(self.volume) or self.volume <= 0:
             raise ValueError(f"demand {self.id!r} needs a positive volume, got {self.volume}")
 
 

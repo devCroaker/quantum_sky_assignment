@@ -454,6 +454,64 @@ docstring rather than left for a reviewer to find.
 **Rejected.** Keeping the probe as a scratch script and describing its result. That is the
 practice this entry exists to end: evidence that cannot be re-run is an anecdote.
 
+## D27. R3's capacity stays overridable, with the default enforcing it
+
+**Context.** An independent review flagged that `NETSCOPE_BACKBONE_CAPACITY` can override the
+550-unit capacity R3 fixes, so an operator can start the application with a value that no
+longer satisfies the requirement as literally written.
+
+**The finding is accurate.** Setting the variable to anything other than 550 produces a
+network R3 does not describe. That is real and worth being explicit about rather than arguing
+away.
+
+**Decided by.** Tool, during P13's review, on the strength of an earlier finding: the setting
+was committed in `.env.example` and read into `Settings`, but nothing wired it through, so it
+silently did nothing. A documented setting that does nothing is worse than no setting, because
+a reader believes it works and nothing from outside reveals otherwise. See the P13 review
+discussion for that half of the reasoning, which this entry was supposed to follow up with a
+decision record and did not, until an external review asked for one.
+
+**Why it stays overridable rather than being removed.**
+
+1. **The default is R3-compliant.** `DEFAULT_BACKBONE_CAPACITY = 550.0`, and every path that
+   builds the application's `Network` uses it unless the environment says otherwise. A clean
+   clone run with no configuration satisfies R3 exactly.
+2. **It is the lever the follow-up session asks for.** The brief's panel session includes
+   about fifteen minutes for a small change made live with the tool's own help. A capacity
+   change is the most natural thing to ask for in that slot, and a setting that already exists
+   and is already tested is a better answer than writing one under time pressure. The
+   `scripts/oracle.py` independent verification also reads from the same input files rather
+   than a hardcoded 550, so a presenter changing the capacity live does not silently
+   desynchronize the one check a reviewer can run themselves.
+3. **Removing it does not remove the underlying tension.** R3 says every backbone link has
+   capacity 550. Nothing in the brief says that number may never be configurable, only that
+   the application's behavior must satisfy it. A fixed constant with no parameter satisfies
+   the letter more simply, but the brief's own production-concerns section asks explicitly
+   whether configuration is handled, which argues for environment-driven settings generally
+   rather than against this one specifically.
+
+**What this means in practice, stated plainly for anyone presenting the application:** the
+one time this matters is if `NETSCOPE_BACKBONE_CAPACITY` is changed to demonstrate something
+live. Say so explicitly when doing it ("this is now running with a different capacity than
+the brief specifies, to show X") rather than let a panel discover a 550 that silently became
+something else. The README documents the default and this decision; it is the presenter's job
+to say when the default has been overridden.
+
+**What was fixed alongside this decision, not instead of it.** The review also found that
+`Link.capacity` and `Demand.volume` both accepted NaN, because `value <= 0` is `False` for
+NaN under IEEE 754 and so never rejects it. That is a real validation gap independent of
+whether the capacity is configurable: a malformed environment variable, not just a malicious
+one, could have produced a `Network` with an unusable capacity that nothing caught until
+somewhere downstream divided by it. Both constructors now check `isfinite` first, matching
+the precedent already set in the SNDlib XML loader for the same reason. This closes the gap
+regardless of what happens to the configurability question above.
+
+**Rejected.** Removing the override and hardcoding 550 with no parameter, which was the
+state before P13 and the state the review's recommendation would restore. Rejected because it
+removes real capability for a requirement the default already satisfies, and because the
+brief rewards exactly this kind of configuration surface under "production concerns" so long
+as it is honestly described, which this entry is the act of doing.
+
 ---
 
 ## Open questions

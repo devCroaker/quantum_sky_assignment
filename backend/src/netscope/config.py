@@ -6,14 +6,17 @@ configuration may come from. This module adds no variable beyond that file:
 anything not listed there has no business being read from the environment
 here.
 
-``NETSCOPE_BACKBONE_CAPACITY`` is read and kept on ``Settings`` for
-completeness with ``.env.example``, but nothing in this task wires it
-anywhere. ``loaders/merge.py`` hardcodes ``BACKBONE_CAPACITY = 550.0`` as a
-module constant with no parameter to override it, and P13's brief does not
-permit editing that file. See the P13 report for this gap: today the
-variable can only ever agree with the hardcoded default, since there is
-nowhere for a different value to take effect, which is worth flagging rather
-than silently accepting.
+``NETSCOPE_BACKBONE_CAPACITY`` is read here and passed through to
+``loaders.merge.build_network`` by ``api.state.build_state``, which is the
+only place the merged ``Network`` is built for the running application. R3
+fixes every backbone link at 550 units, which is this setting's default and
+its value whenever the variable is unset, so the requirement is satisfied
+out of the box. The override exists on top of that default as a deliberate
+extension: it is the one lever a follow-up capacity-planning session needs,
+and removing it would mean reintroducing a documented setting that silently
+does nothing, which is worse than not having it (see D27 in
+``docs/DECISIONS.md`` for the full reasoning, including what still needs
+saying out loud if this setting is ever used to demonstrate a change live).
 """
 
 from __future__ import annotations
