@@ -1,13 +1,20 @@
-"""Structural checks on the committed input files.
+"""Facts about the committed input files that the design depends on.
 
-These run before any loader exists, deliberately. They pin the shape of the
-raw inputs so that a later parsing change cannot quietly be "fixed" by
-editing the data. The expected values come from the assignment brief, which
-states 28 cities, 41 links and 378 demands for file A, and from counting the
-nine rows of file B given in the brief.
+These parse the raw files crudely, independently of the production loaders,
+so they keep their value as an outside check: if a loader is ever wrong,
+these do not move with it.
 
-Parsing here is intentionally crude and independent of the production
-loaders, so that these tests keep their value as an external check.
+What is left here are the facts that justify a design decision rather than
+merely counting rows. The demand total is what makes the brief's merged
+figure of 2068 add up. The 378 demands being exactly 28 choose 2 is what
+says demands are undirected. The capacity modules are asserted present so
+that ignoring them reads as a decision rather than an oversight.
+
+The plain shape checks that used to live here, 28 nodes and 41 links and 378
+demands, and 9 site rows with 14 attachments, were removed once the loaders
+existed: test_sndlib_loader.py and test_sites_loader.py assert the same
+counts on parsed objects, which is strictly more informative, and three
+copies of one number is three places to update rather than three checks.
 """
 
 from __future__ import annotations
@@ -27,13 +34,6 @@ SNDLIB_ENCODING = "ISO-8859-1"
 
 def _sndlib_text() -> str:
     return SNDLIB.read_text(encoding=SNDLIB_ENCODING)
-
-
-def test_backbone_file_has_the_shape_the_brief_describes() -> None:
-    text = _sndlib_text()
-    assert len(re.findall(r"<node id=", text)) == 28
-    assert len(re.findall(r"<link id=", text)) == 41
-    assert len(re.findall(r"<demand id=", text)) == 378
 
 
 def test_backbone_demand_total_is_1898_units() -> None:
@@ -81,22 +81,6 @@ def test_every_link_carries_capacity_modules_that_r3_tells_us_to_ignore() -> Non
     omission.
     """
     assert "<addModule>" in _sndlib_text()
-
-
-def test_sites_file_adds_nine_nodes_and_fourteen_access_links() -> None:
-    with SITES.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.DictReader(handle))
-
-    assert [*rows[0]] == ["site_id", "site_type", "attaches_to", "access_capacity"]
-    assert len(rows) == 9
-
-    attachments = [a for row in rows for a in row["attaches_to"].split(";")]
-    assert len(attachments) == 14
-
-    kinds = [row["site_type"] for row in rows]
-    assert kinds.count("data-center") == 2
-    assert kinds.count("operations-site") == 6
-    assert kinds.count("aggregation-hub") == 1
 
 
 def test_site_attachments_resolve_to_a_city_or_another_site() -> None:

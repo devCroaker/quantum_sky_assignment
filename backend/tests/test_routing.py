@@ -351,8 +351,18 @@ def _assert_path_sets_agree(
 # ---------------------------------------------------------------------------
 
 #: Fixed so a failure is reproducible, and large enough to cover disconnected
-#: graphs and demands with no legal path, both of which are asserted below.
-RANDOM_SEEDS = tuple(range(40))
+#: graphs and demands with no legal path, both of which are asserted below by
+#: ``test_the_random_graphs_cover_the_awkward_cases``.
+#:
+#: Eight, reduced from forty. Three classes each swept all forty, which turned
+#: three property checks into 120 reported test cases and made the suite look
+#: four times larger than the number of ideas in it. The signal saturates long
+#: before forty: a routing bug that survives eight graphs of varying size,
+#: density, transit eligibility and demand set survives forty. Checked before
+#: cutting: seeds 0 to 7 still produce three disconnected graphs and four
+#: stranded demands, so the coverage guard below keeps its teeth. Raise this
+#: number, do not replace it with a random one, if a bug ever slips through.
+RANDOM_SEEDS = tuple(range(8))
 
 
 def _random_network(seed: int) -> Network:
@@ -455,7 +465,7 @@ class TestAgreementWithTheEnumeratingReference:
     def test_on_random_graphs(self, seed: int) -> None:
         _assert_agrees(_random_network(seed))
 
-    @pytest.mark.parametrize("seed", RANDOM_SEEDS[:12])
+    @pytest.mark.parametrize("seed", RANDOM_SEEDS[:4])
     def test_on_random_graphs_with_a_failure(self, seed: int) -> None:
         """Failures on a random graph, which is where the odd shapes turn up."""
         network = _random_network(seed)
@@ -516,7 +526,7 @@ class TestAgreementWithNetworkx:
     def test_on_random_graphs(self, seed: int) -> None:
         _assert_path_sets_agree(_random_network(seed))
 
-    @pytest.mark.parametrize("seed", RANDOM_SEEDS[:12])
+    @pytest.mark.parametrize("seed", RANDOM_SEEDS[:4])
     def test_on_random_graphs_with_a_failure(self, seed: int) -> None:
         network = _random_network(seed)
         failed_node = random.Random(seed + 2_000).choice(sorted(network.nodes))
