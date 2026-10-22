@@ -6,6 +6,7 @@ import type {
   CriticalityReason,
   CriticalityResponse,
   LinkKind,
+  LinkWire,
   NetworkResponse,
   NodeWire,
   RankedLink,
@@ -317,6 +318,24 @@ export function MapView({
     return map;
   }, [mostUtilized]);
 
+  // SVG has no z-index: paint order is document order. A critical or top-five link drawn
+  // in the network's own order can end up underneath several ordinary links that cross it,
+  // which is exactly the "not visible at a glance" complaint the colour and weight above
+  // cannot fix on their own. Marked links are therefore drawn last, over everything plain,
+  // without changing network.links itself or anything else that reads it.
+  const linksInDrawOrder = useMemo(() => {
+    const plain: LinkWire[] = [];
+    const marked: LinkWire[] = [];
+    for (const link of network.links) {
+      if (criticalLinks.has(link.id) || rankByLinkId.has(link.id)) {
+        marked.push(link);
+      } else {
+        plain.push(link);
+      }
+    }
+    return [...plain, ...marked];
+  }, [network.links, criticalLinks, rankByLinkId]);
+
   // Screen-space positions at the current zoom, which is what the clustering threshold is
   // defined against: two nodes far apart when zoomed out can separate once zoomed in, and
   // the grouping has to track that (the reviewer's "zoomed in, they separate" requirement).
@@ -368,7 +387,7 @@ export function MapView({
           >
             {landPath !== null ? <path d={landPath} className="land-outline" /> : null}
             <g className="links">
-              {network.links.map((link) => {
+              {linksInDrawOrder.map((link) => {
                 const [a, b] = link.endpoints;
                 const from = basePositions.get(a);
                 const to = basePositions.get(b);
