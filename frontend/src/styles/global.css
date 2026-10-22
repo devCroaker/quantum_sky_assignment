@@ -11,6 +11,11 @@
   --paper-sunk: #f4f5f7;
   --rule: #d8dbe0;
   --focus: #1b56c4;
+  /* Decoration only, per D21: the ring, the dash pattern and the warning glyph are what
+     carry "critical" on their own and survive greyscale; this red is an accent on top of
+     them so the mark is not missed at a glance on a map with 92 other elements drawn in
+     the same muted ink. */
+  --critical: #b3261e;
   --gap: 0.75rem;
 }
 
@@ -172,34 +177,42 @@ h2 {
 
 /*
  * D21 overlays: a critical node gets a dashed ring plus a warning marker, a critical link
- * gets a dashed stroke, and a top-five link gets a rank badge plus a heavier stroke. Colour
- * (the --critical/--rank variables below) sits on top of all of that but is never the only
- * carrier: the ring, the dash pattern, the stroke weight and the numeral in the badge all
- * survive greyscale on their own.
+ * gets a dashed stroke, and a top-five link gets a rank badge plus a heavier stroke. The
+ * --critical accent colour sits on top of all of that but is never the only carrier: the
+ * ring, the dash pattern, the stroke weight and the numeral in the badge all survive
+ * greyscale on their own. The colour exists so the mark is not missed at a glance, which
+ * the shape alone was not doing against 91 other elements drawn in the same muted ink.
  */
 .critical-ring {
   fill: none;
-  stroke: var(--ink);
-  stroke-width: 1.5;
-  stroke-dasharray: 2 1.5;
+  stroke: var(--critical);
+  stroke-width: 2.25;
+  stroke-dasharray: 3 2;
 }
 
 .critical-marker-triangle {
-  fill: var(--paper);
+  fill: var(--critical);
   stroke: var(--ink);
   stroke-width: 1.2;
 }
 
 .critical-marker-bang {
-  fill: var(--ink);
+  fill: var(--paper);
   font-size: 7px;
   font-weight: 700;
   text-anchor: middle;
 }
 
 .link-critical {
-  stroke-dasharray: 5 3;
-  stroke-width: 1.5;
+  stroke: var(--critical);
+  stroke-dasharray: 6 3;
+  stroke-width: 2.5;
+  opacity: 1;
+}
+
+.node-glyph-critical {
+  stroke: var(--critical);
+  stroke-width: 2.5;
 }
 
 .link-top-utilized {
@@ -219,6 +232,12 @@ h2 {
   text-anchor: middle;
 }
 
+/*
+ * Declared after `.node-glyph-critical` and `.link-critical` above, with equal
+ * specificity (two classes each), so the shared focus colour wins on a critical element
+ * while it is highlighted: the highlight is a transient "this is the one the sidebar
+ * points at" state and must not be masked by the critical marking underneath it.
+ */
 .node-glyph.is-highlighted,
 .link.is-highlighted {
   stroke: var(--focus);

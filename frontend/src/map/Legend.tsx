@@ -21,7 +21,7 @@ export function Legend(): JSX.Element {
             </text>
           </g>
         </svg>
-        <span>Critical node: dashed ring plus a warning marker</span>
+        <span>Critical node: red dashed ring plus a warning marker</span>
       </div>
       <div className="map-legend-item">
         {/*
@@ -38,7 +38,7 @@ export function Legend(): JSX.Element {
             y2={14}
           />
         </svg>
-        <span>Critical link: dashed stroke</span>
+        <span>Critical link: heavier red dashed stroke</span>
       </div>
       <div className="map-legend-item">
         <svg className="map-legend-glyph" viewBox="0 0 28 28" aria-hidden="true">
